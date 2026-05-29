@@ -41,8 +41,12 @@ def fetch_world(kind: str, *, symbol: str | None, page: int, limit: int) -> dict
         return {
             "source": "finance.naver.com public world page",
             "kind": kind,
-            "indices": _extract_links(html, "/world/sise.naver")[:limit] if limit else _extract_links(html, "/world/sise.naver"),
-            "news": _extract_links(html, "/news/news_read.naver")[:limit] if limit else _extract_links(html, "/news/news_read.naver"),
+            "indices": _extract_links(html, "/world/sise.naver")[:limit]
+            if limit
+            else _extract_links(html, "/world/sise.naver"),
+            "news": _extract_links(html, "/news/news_read.naver")[:limit]
+            if limit
+            else _extract_links(html, "/news/news_read.naver"),
         }
     if kind == "hours":
         return _fetch_hours(limit=limit)
@@ -51,12 +55,21 @@ def fetch_world(kind: str, *, symbol: str | None, page: int, limit: int) -> dict
         raise SystemExit("--symbol is required for --kind index or prices")
     if kind == "prices":
         return _fetch_prices(resolved, page=page, limit=limit)
-    return _fetch_tables("/world/sise.naver", {"symbol": resolved, "fdtc": 0, "page": page}, kind=kind, page=page, limit=limit)
+    return _fetch_tables(
+        "/world/sise.naver",
+        {"symbol": resolved, "fdtc": 0, "page": page},
+        kind=kind,
+        page=page,
+        limit=limit,
+    )
 
 
 def _fetch_prices(symbol: str, *, page: int, limit: int) -> dict:
     rows = request_json_url(
-        PC_BASE_URL + build_path("/world/worldDayListJson.naver", {"symbol": symbol, "fdtc": 0, "page": page}),
+        PC_BASE_URL
+        + build_path(
+            "/world/worldDayListJson.naver", {"symbol": symbol, "fdtc": 0, "page": page}
+        ),
         referer=PC_BASE_URL + "/world/",
     )
     return {
@@ -81,7 +94,14 @@ def _fetch_hours(*, limit: int) -> dict:
 def _extract_trading_hours(html: str) -> list[dict[str, str]]:
     for table in extract_tables(html):
         rows = table["rows"]
-        if not rows or rows[0][:6] != ["대륙", "국가", "현지시간", "한국시간", "GMT 대비", "DST 적용시간"]:
+        if not rows or rows[0][:6] != [
+            "대륙",
+            "국가",
+            "현지시간",
+            "한국시간",
+            "GMT 대비",
+            "DST 적용시간",
+        ]:
             continue
         records = []
         current_continent = ""
@@ -120,13 +140,20 @@ def _fetch_tables(path: str, params: dict, *, kind: str, page: int, limit: int) 
                     "rows": records[:limit] if limit else records,
                 }
             )
-    return {"source": "finance.naver.com public world HTML table", "kind": kind, "page": page, "tables": tables[:limit] if limit else tables}
+    return {
+        "source": "finance.naver.com public world HTML table",
+        "kind": kind,
+        "page": page,
+        "tables": tables[:limit] if limit else tables,
+    }
 
 
 def _extract_links(html: str, contains: str) -> list[dict[str, str]]:
     links = []
     seen = set()
-    for href, body in re.findall(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, flags=re.S):
+    for href, body in re.findall(
+        r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, flags=re.S
+    ):
         if contains not in href:
             continue
         label = clean_cell(strip_tags(body))
@@ -139,13 +166,22 @@ def _extract_links(html: str, contains: str) -> list[dict[str, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--kind", choices=["overview", "index", "prices", "hours"], default="overview")
-    parser.add_argument("--symbol", help="World index alias or symbol, e.g. nasdaq or NAS@IXIC")
+    parser.add_argument(
+        "--kind", choices=["overview", "index", "prices", "hours"], default="overview"
+    )
+    parser.add_argument(
+        "--symbol", help="World index alias or symbol, e.g. nasdaq or NAS@IXIC"
+    )
     parser.add_argument("--page", type=int, default=1)
     add_limit_argument(parser, default=10)
     add_output_argument(parser)
     args = parser.parse_args()
-    emit_output(render_json(fetch_world(args.kind, symbol=args.symbol, page=args.page, limit=args.limit)), args.output)
+    emit_output(
+        render_json(
+            fetch_world(args.kind, symbol=args.symbol, page=args.page, limit=args.limit)
+        ),
+        args.output,
+    )
     return 0
 
 

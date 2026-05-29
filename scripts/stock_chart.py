@@ -36,7 +36,9 @@ def fetch_chart(
     fallback_legacy: bool,
 ) -> dict:
     code = normalize_stock_code(code)
-    chart_type = {"day": "candleDay", "week": "candleWeek", "month": "candleMonth"}[period]
+    chart_type = {"day": "candleDay", "week": "candleWeek", "month": "candleMonth"}[
+        period
+    ]
     try:
         payload = front_json(
             "/chart/domestic/stock/end",
@@ -86,8 +88,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--code", required=True, type=normalize_stock_code)
     parser.add_argument("--period", default="day", choices=["day", "week", "month"])
-    parser.add_argument("--start", required=True, type=normalize_yyyymmdd, help="YYYYMMDD")
-    parser.add_argument("--end", required=True, type=normalize_yyyymmdd, help="YYYYMMDD")
+    parser.add_argument(
+        "--start", required=True, type=normalize_yyyymmdd, help="YYYYMMDD"
+    )
+    parser.add_argument(
+        "--end", required=True, type=normalize_yyyymmdd, help="YYYYMMDD"
+    )
     parser.add_argument("--no-fallback-legacy", action="store_true")
     add_limit_argument(parser, default=200)
     add_output_argument(parser)

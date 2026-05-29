@@ -22,16 +22,70 @@ from naverfinance_api import (
 
 
 NEWS_KIND_PARAMS = {
-    "flash": ("/news/news_list.naver", {"mode": "LSS2D", "section_id": "101", "section_id2": "258"}),
+    "flash": (
+        "/news/news_list.naver",
+        {"mode": "LSS2D", "section_id": "101", "section_id2": "258"},
+    ),
     "main": ("/news/mainnews.naver", {}),
-    "market": ("/news/news_list.naver", {"mode": "LSS3D", "section_id": "101", "section_id2": "258", "section_id3": "401"}),
-    "analysis": ("/news/news_list.naver", {"mode": "LSS3D", "section_id": "101", "section_id2": "258", "section_id3": "402"}),
-    "world": ("/news/news_list.naver", {"mode": "LSS3D", "section_id": "101", "section_id2": "258", "section_id3": "403"}),
-    "bond": ("/news/news_list.naver", {"mode": "LSS3D", "section_id": "101", "section_id2": "258", "section_id3": "404"}),
-    "memo": ("/news/news_list.naver", {"mode": "LSS3D", "section_id": "101", "section_id2": "258", "section_id3": "406"}),
-    "fx": ("/news/news_list.naver", {"mode": "LSS3D", "section_id": "101", "section_id2": "258", "section_id3": "429"}),
+    "market": (
+        "/news/news_list.naver",
+        {
+            "mode": "LSS3D",
+            "section_id": "101",
+            "section_id2": "258",
+            "section_id3": "401",
+        },
+    ),
+    "analysis": (
+        "/news/news_list.naver",
+        {
+            "mode": "LSS3D",
+            "section_id": "101",
+            "section_id2": "258",
+            "section_id3": "402",
+        },
+    ),
+    "world": (
+        "/news/news_list.naver",
+        {
+            "mode": "LSS3D",
+            "section_id": "101",
+            "section_id2": "258",
+            "section_id3": "403",
+        },
+    ),
+    "bond": (
+        "/news/news_list.naver",
+        {
+            "mode": "LSS3D",
+            "section_id": "101",
+            "section_id2": "258",
+            "section_id3": "404",
+        },
+    ),
+    "memo": (
+        "/news/news_list.naver",
+        {
+            "mode": "LSS3D",
+            "section_id": "101",
+            "section_id2": "258",
+            "section_id3": "406",
+        },
+    ),
+    "fx": (
+        "/news/news_list.naver",
+        {
+            "mode": "LSS3D",
+            "section_id": "101",
+            "section_id2": "258",
+            "section_id3": "429",
+        },
+    ),
     "rank": ("/news/news_list.naver", {"mode": "RANK"}),
-    "photo": ("/news/news_list.naver", {"mode": "LSTD", "section_id": "101", "section_id2": "258", "type": "1"}),
+    "photo": (
+        "/news/news_list.naver",
+        {"mode": "LSTD", "section_id": "101", "section_id2": "258", "type": "1"},
+    ),
     "tv": ("/news/news_list.naver", {"mode": "TV", "section_id": "tv"}),
     "notice": ("/news/market_notice.naver", {}),
 }
@@ -52,14 +106,22 @@ def fetch_news(code: str | None, *, kind: str, page: int, limit: int) -> dict:
                 {"itemCode": code, "page": page, "pageSize": limit or 20},
                 referer_path=f"/domestic/stock/{code}/total",
             )
-            rows = payload.get("stockNewsList", []) if isinstance(payload, dict) else payload
+            rows = (
+                payload.get("stockNewsList", [])
+                if isinstance(payload, dict)
+                else payload
+            )
         else:
             payload = front_json(
                 "/stock/domestic/disclosure",
                 {"code": code, "page": page, "pageSize": limit or 20},
                 referer_path=f"/domestic/stock/{code}/notice",
             )
-            rows = payload.get("disclosures", payload) if isinstance(payload, dict) else payload
+            rows = (
+                payload.get("disclosures", payload)
+                if isinstance(payload, dict)
+                else payload
+            )
         return {
             "source": "m.stock.naver.com public front-api JSON",
             "code": code,
@@ -76,7 +138,9 @@ def fetch_news(code: str | None, *, kind: str, page: int, limit: int) -> dict:
     else:
         path = "/item/news_notice.naver"
         params = {"code": code, "page": page}
-    html = pc_text(path, params, referer=f"https://finance.naver.com/item/news.naver?code={code}")
+    html = pc_text(
+        path, params, referer=f"https://finance.naver.com/item/news.naver?code={code}"
+    )
     rows = []
     for table in extract_tables(html):
         if table["attrs"].get("class") != "type5":
@@ -97,7 +161,9 @@ def fetch_general_news(kind: str, *, page: int, limit: int) -> dict:
     path, params = NEWS_KIND_PARAMS[kind]
     params = {**params, "page": page}
     html = pc_text(path, params)
-    rows = _extract_notice_rows(html) if kind == "notice" else _extract_article_links(html)
+    rows = (
+        _extract_notice_rows(html) if kind == "notice" else _extract_article_links(html)
+    )
     return {
         "source": "finance.naver.com public news HTML page",
         "kind": kind,
@@ -108,7 +174,9 @@ def fetch_general_news(kind: str, *, page: int, limit: int) -> dict:
 
 def fetch_news_search(query: str, *, page: int, limit: int) -> dict:
     html = pc_text("/news/news_search.naver", {"q": query, "page": page})
-    rows = [row for row in _extract_article_links(html) if query in row.get("title", "")]
+    rows = [
+        row for row in _extract_article_links(html) if query in row.get("title", "")
+    ]
     return {
         "source": "finance.naver.com public news search HTML page",
         "kind": "search",
@@ -122,7 +190,11 @@ def fetch_news_search(query: str, *, page: int, limit: int) -> dict:
 def _extract_article_links(html: str) -> list[dict[str, str]]:
     rows = []
     seen = set()
-    for href, body in re.findall(r'<a[^>]+href="([^"]*/news/news_read\.naver[^"]*)"[^>]*>(.*?)</a>', html, flags=re.S):
+    for href, body in re.findall(
+        r'<a[^>]+href="([^"]*/news/news_read\.naver[^"]*)"[^>]*>(.*?)</a>',
+        html,
+        flags=re.S,
+    ):
         title = clean_cell(strip_tags(body))
         if not title or (title, href) in seen:
             continue
@@ -133,7 +205,11 @@ def _extract_article_links(html: str) -> list[dict[str, str]]:
 
 def _extract_notice_rows(html: str) -> list[dict[str, str]]:
     rows = []
-    for href, body in re.findall(r'<a[^>]+href="([^"]*/news/market_notice_read\.naver[^"]*)"[^>]*>(.*?)</a>', html, flags=re.S):
+    for href, body in re.findall(
+        r'<a[^>]+href="([^"]*/news/market_notice_read\.naver[^"]*)"[^>]*>(.*?)</a>',
+        html,
+        flags=re.S,
+    ):
         title = clean_cell(strip_tags(body))
         if title:
             rows.append({"title": title, "url": href})
@@ -143,7 +219,11 @@ def _extract_notice_rows(html: str) -> list[dict[str, str]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--code", type=normalize_stock_code)
-    parser.add_argument("--kind", choices=["stock", "disclosure", "search", *sorted(NEWS_KIND_PARAMS)], default="stock")
+    parser.add_argument(
+        "--kind",
+        choices=["stock", "disclosure", "search", *sorted(NEWS_KIND_PARAMS)],
+        default="stock",
+    )
     parser.add_argument("--query", help="Search query for --kind search")
     parser.add_argument("--page", type=int, default=1)
     add_limit_argument(parser, default=10)
@@ -154,7 +234,9 @@ def main() -> int:
             raise SystemExit("--query is required for --kind search")
         payload = fetch_news_search(args.query, page=args.page, limit=args.limit)
     else:
-        payload = fetch_news(args.code, kind=args.kind, page=args.page, limit=args.limit)
+        payload = fetch_news(
+            args.code, kind=args.kind, page=args.page, limit=args.limit
+        )
     emit_output(render_json(payload), args.output)
     return 0
 

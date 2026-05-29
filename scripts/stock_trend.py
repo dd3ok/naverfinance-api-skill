@@ -26,7 +26,11 @@ def fetch_trend(code: str, *, page: int, limit: int) -> dict:
             {"code": code},
             referer_path=f"/domestic/stock/{code}/total",
         )
-        rows = payload.get("dealTrendInfos", payload) if isinstance(payload, dict) else payload
+        rows = (
+            payload.get("dealTrendInfos", payload)
+            if isinstance(payload, dict)
+            else payload
+        )
         return {
             "source": "m.stock.naver.com public front-api JSON",
             "code": code,
@@ -56,7 +60,10 @@ def main() -> int:
     add_limit_argument(parser, default=20)
     add_output_argument(parser)
     args = parser.parse_args()
-    emit_output(render_json(fetch_trend(args.code, page=args.page, limit=args.limit)), args.output)
+    emit_output(
+        render_json(fetch_trend(args.code, page=args.page, limit=args.limit)),
+        args.output,
+    )
     return 0
 
 

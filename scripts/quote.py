@@ -18,7 +18,9 @@ from naverfinance_api import (
 
 def fetch_quotes(codes: list[str], *, index_codes: list[str] | None = None) -> dict:
     normalized = [normalize_stock_code(code) for code in codes]
-    normalized_indexes = [_normalize_index_quote_code(code) for code in index_codes or []]
+    normalized_indexes = [
+        _normalize_index_quote_code(code) for code in index_codes or []
+    ]
     query_parts = []
     if normalized:
         query_parts.append("SERVICE_ITEM:" + ",".join(normalized))
@@ -27,7 +29,8 @@ def fetch_quotes(codes: list[str], *, index_codes: list[str] | None = None) -> d
     if not query_parts:
         raise SystemExit("At least one --code or --index is required")
     payload = request_json_url(
-        POLLING_BASE_URL + build_path("/api/realtime", {"query": "|".join(query_parts)}),
+        POLLING_BASE_URL
+        + build_path("/api/realtime", {"query": "|".join(query_parts)}),
         referer="https://finance.naver.com/",
     )
     return {
@@ -61,7 +64,9 @@ def main() -> int:
     )
     add_output_argument(parser)
     args = parser.parse_args()
-    emit_output(render_json(fetch_quotes(args.code, index_codes=args.index)), args.output)
+    emit_output(
+        render_json(fetch_quotes(args.code, index_codes=args.index)), args.output
+    )
     return 0
 
 

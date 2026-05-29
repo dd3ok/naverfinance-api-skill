@@ -38,7 +38,9 @@ def fetch_index(
     code = normalize_index_code(code)
     if code not in DOMESTIC_INDEX_CODES:
         if include_chart:
-            raise SystemExit("--include-chart is supported only for KOSPI, KOSDAQ, and KPI200")
+            raise SystemExit(
+                "--include-chart is supported only for KOSPI, KOSDAQ, and KPI200"
+            )
         return fetch_market_index(code, limit=limit)
 
     payload = {
@@ -53,13 +55,19 @@ def fetch_index(
     if include_chart:
         if not start or not end:
             raise SystemExit("--start and --end are required with --include-chart")
-        chart_type = {"day": "candleDay", "week": "candleWeek", "month": "candleMonth"}[period]
+        chart_type = {"day": "candleDay", "week": "candleWeek", "month": "candleMonth"}[
+            period
+        ]
         chart_payload = front_json(
             "/chart/domestic/stock/end",
             {"code": code, "chartInfoType": "index", "scriptChartType": chart_type},
             referer_path=f"/domestic/index/{code}/chart",
         )
-        rows = chart_payload.get("priceInfos", []) if isinstance(chart_payload, dict) else chart_payload
+        rows = (
+            chart_payload.get("priceInfos", [])
+            if isinstance(chart_payload, dict)
+            else chart_payload
+        )
         rows = [row for row in rows if start <= str(row.get("localDate", "")) <= end]
         payload["chart"] = rows[-limit:] if isinstance(rows, list) and limit else rows
     return payload
@@ -73,7 +81,9 @@ def fetch_market_index(code: str, *, limit: int) -> dict:
         route = market_index_route(code)
         if route is None:
             supported = "KOSPI, KOSDAQ, KPI200, FX_*, OIL_*, CMDT_*, IRR_*, GOLD_KRX, or world symbols like NAS@IXIC"
-            raise SystemExit(f"{code} is not supported by indices.py; use one of: {supported}")
+            raise SystemExit(
+                f"{code} is not supported by indices.py; use one of: {supported}"
+            )
         path, params = route
         html = pc_text(path, params)
         source = "finance.naver.com public market-index HTML table"

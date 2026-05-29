@@ -72,6 +72,8 @@ git clone --depth 1 https://github.com/dd3ok/naverfinance-api-skill.git .claude/
 
 Gemini CLI에서도 같은 `SKILL.md` 패키지를 Agent Skill로 연결할 수 있습니다.
 
+This repository is distributed as an Agent Skill package. It does not include a Gemini extension manifest such as `gemini-extension.json`.
+
 Interactive Gemini CLI sessions can use:
 
 ```text
