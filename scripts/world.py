@@ -7,13 +7,16 @@ import argparse
 import re
 
 from naverfinance_api import (
+    PC_BASE_URL,
     add_limit_argument,
     add_output_argument,
+    build_path,
     clean_cell,
     emit_output,
     extract_tables,
     pc_text,
     render_json,
+    request_json_url,
     strip_tags,
     table_to_records,
 )
@@ -45,8 +48,24 @@ def fetch_world(kind: str, *, symbol: str | None, page: int, limit: int) -> dict
         return _fetch_hours(limit=limit)
     resolved = WORLD_SYMBOLS.get(symbol or "", symbol)
     if not resolved:
-        raise SystemExit("--symbol is required for --kind index")
+        raise SystemExit("--symbol is required for --kind index or prices")
+    if kind == "prices":
+        return _fetch_prices(resolved, page=page, limit=limit)
     return _fetch_tables("/world/sise.naver", {"symbol": resolved, "fdtc": 0, "page": page}, kind=kind, page=page, limit=limit)
+
+
+def _fetch_prices(symbol: str, *, page: int, limit: int) -> dict:
+    rows = request_json_url(
+        PC_BASE_URL + build_path("/world/worldDayListJson.naver", {"symbol": symbol, "fdtc": 0, "page": page}),
+        referer=PC_BASE_URL + "/world/",
+    )
+    return {
+        "source": "finance.naver.com public worldDayListJson",
+        "kind": "prices",
+        "symbol": symbol,
+        "page": page,
+        "rows": rows[:limit] if isinstance(rows, list) and limit else rows,
+    }
 
 
 def _fetch_hours(*, limit: int) -> dict:
@@ -120,7 +139,7 @@ def _extract_links(html: str, contains: str) -> list[dict[str, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--kind", choices=["overview", "index", "hours"], default="overview")
+    parser.add_argument("--kind", choices=["overview", "index", "prices", "hours"], default="overview")
     parser.add_argument("--symbol", help="World index alias or symbol, e.g. nasdaq or NAS@IXIC")
     parser.add_argument("--page", type=int, default=1)
     add_limit_argument(parser, default=10)

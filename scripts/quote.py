@@ -16,18 +16,32 @@ from naverfinance_api import (
 )
 
 
-def fetch_quotes(codes: list[str]) -> dict:
+def fetch_quotes(codes: list[str], *, index_codes: list[str] | None = None) -> dict:
     normalized = [normalize_stock_code(code) for code in codes]
-    query = "SERVICE_ITEM:" + ",".join(normalized)
+    normalized_indexes = [_normalize_index_quote_code(code) for code in index_codes or []]
+    query_parts = []
+    if normalized:
+        query_parts.append("SERVICE_ITEM:" + ",".join(normalized))
+    if normalized_indexes:
+        query_parts.append("SERVICE_INDEX:" + ",".join(normalized_indexes))
+    if not query_parts:
+        raise SystemExit("At least one --code or --index is required")
     payload = request_json_url(
-        POLLING_BASE_URL + build_path("/api/realtime", {"query": query}),
+        POLLING_BASE_URL + build_path("/api/realtime", {"query": "|".join(query_parts)}),
         referer="https://finance.naver.com/",
     )
     return {
         "source": "polling.finance.naver.com public realtime endpoint",
         "codes": normalized,
+        "indexes": normalized_indexes,
         "payload": payload,
     }
+
+
+def _normalize_index_quote_code(code: str) -> str:
+    value = code.strip().upper()
+    aliases = {"KOSPI200": "KPI200"}
+    return aliases.get(value, value)
 
 
 def main() -> int:
@@ -35,13 +49,19 @@ def main() -> int:
     parser.add_argument(
         "--code",
         action="append",
-        required=True,
+        default=[],
         type=normalize_stock_code,
         help="Six-digit stock code. Repeat --code to fetch multiple quotes.",
     )
+    parser.add_argument(
+        "--index",
+        action="append",
+        default=[],
+        help="Index code such as KOSPI, KOSDAQ, KPI200, or KVALUE. Repeat to fetch multiple indexes.",
+    )
     add_output_argument(parser)
     args = parser.parse_args()
-    emit_output(render_json(fetch_quotes(args.code)), args.output)
+    emit_output(render_json(fetch_quotes(args.code, index_codes=args.index)), args.output)
     return 0
 
 

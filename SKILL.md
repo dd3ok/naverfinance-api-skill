@@ -11,8 +11,9 @@ Use this skill for public read-only Naver Finance/Npay Stock market data. Prefer
 
 | 사용자 의도 | 우선 사용 | 필요할 때 읽기 |
 | --- | --- | --- |
+| 증권 홈 요약, TOP 종목, KRX/NXT 홈 위젯 | `scripts/home.py` | [references/api-catalog.md](references/api-catalog.md) |
 | 종목 요약, 주요 지표, peer/industry | `scripts/stock_summary.py` | [references/api-catalog.md](references/api-catalog.md) |
-| 현재 시세, realtime polling, NXT 정보 | `scripts/quote.py` | [references/api-catalog.md](references/api-catalog.md), [references/response-notes.md](references/response-notes.md) |
+| 현재 시세, 지수 quote, realtime polling, NXT 정보 | `scripts/quote.py` | [references/api-catalog.md](references/api-catalog.md), [references/response-notes.md](references/response-notes.md) |
 | 일/주/월 chart | `scripts/stock_chart.py` | [references/api-catalog.md](references/api-catalog.md) |
 | 종목 투자자 trend/history | `scripts/stock_trend.py` | [references/api-catalog.md](references/api-catalog.md) |
 | 종목 뉴스, 공개 공시, `/news/` menu | `scripts/news.py` | [references/api-catalog.md](references/api-catalog.md) |
@@ -25,11 +26,12 @@ Use this skill for public read-only Naver Finance/Npay Stock market data. Prefer
 
 ## Source 우선순위
 
-1. Use `m.stock.naver.com/front-api/...` JSON for stock basics, integration panels, charts, indices, home/market widgets, news widgets, IPO widgets, and mobile menu data.
+1. Use `m.stock.naver.com/front-api/...` JSON for stock basics, integration panels, charts, indices, home/market widgets, sector/theme/group widgets, news widgets, IPO widgets, and mobile menu data.
 2. Use `polling.finance.naver.com/api/realtime` for realtime quote fields visible on PC stock pages.
-3. Use `finance.naver.com` PC HTML only for public legacy tables not represented in mobile JSON.
-4. Use `navercomp.wisereport.co.kr` only through the `/item/coinfo.naver?code=...` stock-analysis iframe path.
-5. When duplicate data exists, prefer the most structured source unless the user asks to compare sources.
+3. Use `api.stock.naver.com/marketindex/...` JSON for market-index exchange/world-exchange, energy, and metals details when it answers the question. Use PC marketindex detail pages for legacy-only interest-rate pages.
+4. Use `finance.naver.com` PC HTML only for public legacy tables not represented in structured JSON. NXT ranking pages still use `/sise/nxt_*.naver` PC HTML.
+5. Use `navercomp.wisereport.co.kr` only through the `/item/coinfo.naver?code=...` stock-analysis iframe path.
+6. When duplicate data exists, prefer the most structured source unless the user asks to compare sources.
 
 ## Workflow
 
@@ -43,7 +45,9 @@ Common command shapes:
 
 ```bash
 python3 scripts/stock_summary.py --code 005930
+python3 scripts/home.py --limit 5
 python3 scripts/quote.py --code 005930 --code 000660
+python3 scripts/quote.py --index KOSPI --index KOSDAQ --index KPI200
 python3 scripts/stock_chart.py --code 005930 --period day --start 20260420 --end 20260427
 python3 scripts/market_ranking.py --kind market-cap --market kospi --page 1 --limit 10
 ```

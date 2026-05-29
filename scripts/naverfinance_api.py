@@ -17,6 +17,7 @@ from typing import Any
 
 
 MOBILE_BASE_URL = "https://m.stock.naver.com"
+STOCK_API_BASE_URL = "https://api.stock.naver.com"
 PC_BASE_URL = "https://finance.naver.com"
 POLLING_BASE_URL = "https://polling.finance.naver.com"
 WISEREPORT_BASE_URL = "https://navercomp.wisereport.co.kr/v2"

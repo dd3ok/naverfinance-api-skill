@@ -85,9 +85,23 @@ FRONT_SORT_TYPES = {
 }
 
 
+def _fallback_reason(exc: Exception) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+
 def fetch_ranking(kind: str, *, market: str, page: int, limit: int) -> dict:
-    if kind in {"konex", "etf", "etn"}:
+    fallback_reason = None
+    if kind == "dividend":
+        return fetch_dividend(page=page, limit=limit)
+    if kind == "etf":
+        return fetch_etf(page=page, limit=limit)
+    if kind in {"konex", "etn"}:
         return fetch_exchange_traded_products(kind, page=page, limit=limit)
+    if kind in {"theme", "upjong", "group"}:
+        try:
+            return fetch_sector_list(kind, page=page, limit=limit)
+        except Exception as exc:
+            fallback_reason = _fallback_reason(exc)
     if kind == "investor-trend":
         return fetch_investor_trend(market=market, page=page, limit=limit)
     if kind == "program-trend":
@@ -115,8 +129,8 @@ def fetch_ranking(kind: str, *, market: str, page: int, limit: int) -> dict:
                 "page": page,
                 "rows": payload.get("stocks", []) if isinstance(payload, dict) else payload,
             }
-        except Exception:
-            pass
+        except Exception as exc:
+            fallback_reason = _fallback_reason(exc)
 
     path = KIND_PATHS[kind]
     params: dict[str, str | int] = {"page": page}
@@ -133,13 +147,16 @@ def fetch_ranking(kind: str, *, market: str, page: int, limit: int) -> dict:
     html = pc_text(path, params)
     rows = _extract_menu_rows(kind, html)
     _attach_detail_links(kind, rows, html)
-    return {
+    result = {
         "source": "finance.naver.com public PC HTML table",
         "kind": kind,
         "market": market,
         "page": page,
         "rows": rows[:limit] if limit else rows,
     }
+    if fallback_reason:
+        result["fallbackReason"] = fallback_reason
+    return result
 
 
 def fetch_group_detail(kind: str, no: str, *, page: int, limit: int) -> dict:
@@ -206,6 +223,99 @@ def fetch_exchange_traded_products(kind: str, *, page: int, limit: int) -> dict:
         "page": page,
         "rows": paged_rows,
     }
+
+
+def fetch_dividend(*, page: int, limit: int) -> dict:
+    try:
+        payload = front_json(
+            "/domestic/stock/list",
+            {
+                "sortType": "dividend",
+                "category": "rate",
+                "page": page,
+                "pageSize": limit or 20,
+            },
+            referer_path="/domestic/home/dividend/revenue",
+        )
+        rows = payload.get("dividends", payload.get("stocks", payload)) if isinstance(payload, dict) else payload
+        return {
+            "source": "m.stock.naver.com public front-api JSON",
+            "kind": "dividend",
+            "market": "domestic",
+            "page": page,
+            "rows": rows[:limit] if isinstance(rows, list) and limit else rows,
+        }
+    except Exception as exc:
+        html = pc_text(KIND_PATHS["dividend"], {"page": page})
+        rows = _extract_menu_rows("dividend", html)
+        return {
+            "source": "finance.naver.com public PC HTML table",
+            "kind": "dividend",
+            "market": "domestic",
+            "page": page,
+            "rows": rows[:limit] if limit else rows,
+            "fallbackReason": _fallback_reason(exc),
+        }
+
+
+def fetch_etf(*, page: int, limit: int) -> dict:
+    try:
+        payload = front_json(
+            "/domestic/etf/list",
+            {"sortTypeCode": "aum", "page": page, "pageSize": limit or 20},
+            referer_path="/domestic/home/etf/aum",
+        )
+        rows = payload.get("etfs", payload.get("stocks", payload.get("result", payload))) if isinstance(payload, dict) else payload
+        return {
+            "source": "m.stock.naver.com public front-api JSON",
+            "kind": "etf",
+            "market": "domestic",
+            "page": page,
+            "rows": rows[:limit] if isinstance(rows, list) and limit else rows,
+        }
+    except Exception as exc:
+        result = fetch_exchange_traded_products("etf", page=page, limit=limit)
+        result["market"] = "domestic"
+        result["fallbackReason"] = _fallback_reason(exc)
+        return result
+
+
+def fetch_sector_list(kind: str, *, page: int, limit: int) -> dict:
+    payload = front_json(
+        "/stock/sectors/all",
+        {
+            "nationType": "domestic",
+            "sectorType": kind,
+            "sectorSortType": "CHANGE_RATE",
+            "businessDayCategory": "daily",
+            "page": page,
+            "pageSize": limit or 20,
+        },
+        referer_path=f"/domestic/home/{kind}/daily",
+    )
+    rows = payload.get("sectors", payload.get("result", payload)) if isinstance(payload, dict) else payload
+    rows = _with_sector_detail_links(kind, rows)
+    return {
+        "source": "m.stock.naver.com public sector JSON",
+        "kind": kind,
+        "market": "domestic",
+        "page": page,
+        "rows": rows[:limit] if isinstance(rows, list) and limit else rows,
+    }
+
+
+def _with_sector_detail_links(kind: str, rows):
+    if not isinstance(rows, list):
+        return rows
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        detail_no = str(row.get("sectorCode") or "")
+        if not detail_no:
+            continue
+        row.setdefault("detailNo", detail_no)
+        row.setdefault("detailUrl", build_path("/sise/sise_group_detail.naver", {"type": kind, "no": detail_no}))
+    return rows
 
 
 def fetch_investor_trend(*, market: str, page: int, limit: int) -> dict:
