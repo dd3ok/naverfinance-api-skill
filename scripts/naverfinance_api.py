@@ -35,13 +35,21 @@ SENSITIVE_PATH_MARKERS = {
     "account",
     "auth",
     "balance",
+    "broker",
+    "comment",
     "cookie",
+    "discussion",
     "holding",
+    "login",
     "my",
+    "mystock",
+    "opentalk",
     "order",
     "payment",
+    "profile",
     "token",
     "userinfo",
+    "wts",
 }
 SENSITIVE_QUERY_KEYS = SENSITIVE_PATH_MARKERS | {
     "access_token",
@@ -54,6 +62,11 @@ SENSITIVE_QUERY_KEYS = SENSITIVE_PATH_MARKERS | {
     "refresh_token",
     "refreshtoken",
     "user_info",
+}
+SENSITIVE_QUERY_VALUE_MARKERS = {
+    "mystock",
+    "personalized",
+    "servicemystockitem",
 }
 
 
@@ -107,22 +120,26 @@ def request_bytes(
             return resp.read(), content_type
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:800]
-        raise RuntimeError(f"Naver endpoint returned HTTP {exc.code}: {detail}") from exc
+        raise RuntimeError(
+            f"Naver endpoint returned HTTP {exc.code}: {detail}"
+        ) from exc
 
 
 def _validate_public_url(url: str) -> None:
     parsed = urllib.parse.urlparse(url)
     host = (parsed.hostname or "").lower()
     if parsed.scheme != "https" or host not in ALLOWED_PUBLIC_HOSTS:
-        raise RuntimeError(f"Unsupported Naver public host: {host or parsed.netloc or '<missing>'}")
+        raise RuntimeError(
+            f"Unsupported Naver public host: {host or parsed.netloc or '<missing>'}"
+        )
     path_markers = _sensitive_path_markers(parsed.path)
     if path_markers:
         joined = ", ".join(sorted(path_markers))
         raise RuntimeError(f"Blocked sensitive Naver URL path marker: {joined}")
-    query_markers = _sensitive_query_keys(parsed.query)
+    query_markers = _sensitive_query_markers(parsed.query)
     if query_markers:
         joined = ", ".join(sorted(query_markers))
-        raise RuntimeError(f"Blocked sensitive Naver URL query key: {joined}")
+        raise RuntimeError(f"Blocked sensitive Naver URL query marker: {joined}")
 
 
 def _sensitive_path_markers(path: str) -> set[str]:
@@ -141,13 +158,23 @@ def _sensitive_path_markers(path: str) -> set[str]:
     return markers
 
 
-def _sensitive_query_keys(query: str) -> set[str]:
+def _sensitive_query_markers(query: str) -> set[str]:
     markers: set[str] = set()
-    for key, _value in urllib.parse.parse_qsl(query, keep_blank_values=True):
+    for key, value in urllib.parse.parse_qsl(query, keep_blank_values=True):
         lowered = key.lower()
         compact = re.sub(r"[^a-z0-9]", "", lowered)
         if lowered in SENSITIVE_QUERY_KEYS or compact in SENSITIVE_QUERY_KEYS:
             markers.add(lowered)
+        value_lowered = value.lower()
+        value_compact = re.sub(r"[^a-z0-9]", "", value_lowered)
+        value_tokens = {
+            token for token in re.split(r"[^a-z0-9]+", value_lowered) if token
+        }
+        for marker in SENSITIVE_QUERY_VALUE_MARKERS:
+            if marker in value_compact or marker in value_tokens:
+                markers.add(marker)
+        if "my" in value_tokens:
+            markers.add("my")
     return markers
 
 
@@ -158,7 +185,9 @@ def request_text(
     referer: str | None = None,
     accept: str = "*/*",
 ) -> str:
-    raw, content_type = request_bytes(url, timeout=timeout, referer=referer, accept=accept)
+    raw, content_type = request_bytes(
+        url, timeout=timeout, referer=referer, accept=accept
+    )
     encoding = _encoding_from_content_type(content_type) or "utf-8"
     try:
         return raw.decode(encoding)
@@ -190,31 +219,43 @@ def request_json_url(
         raise RuntimeError(f"Expected JSON but got: {preview}") from exc
 
 
-def mobile_json(path: str, params: dict[str, Any] | None = None, *, referer_path: str = "/") -> Any:
+def mobile_json(
+    path: str, params: dict[str, Any] | None = None, *, referer_path: str = "/"
+) -> Any:
     return request_json_url(
         MOBILE_BASE_URL + build_path(path, params),
         referer=MOBILE_BASE_URL + referer_path,
     )
 
 
-def front_json(path: str, params: dict[str, Any] | None = None, *, referer_path: str = "/") -> Any:
+def front_json(
+    path: str, params: dict[str, Any] | None = None, *, referer_path: str = "/"
+) -> Any:
     payload = mobile_json("/front-api" + path, params, referer_path=referer_path)
     if isinstance(payload, dict) and "isSuccess" in payload:
         if payload.get("isSuccess") is True and "result" in payload:
             return payload["result"]
         detail = payload.get("detailCode") or payload.get("code") or "unknown"
-        message = payload.get("message") or payload.get("error") or "Naver front-api request failed"
+        message = (
+            payload.get("message")
+            or payload.get("error")
+            or "Naver front-api request failed"
+        )
         raise RuntimeError(f"Naver front-api error {detail}: {message}")
     return payload
 
 
-def pc_text(path: str, params: dict[str, Any] | None = None, *, referer: str | None = None) -> str:
+def pc_text(
+    path: str, params: dict[str, Any] | None = None, *, referer: str | None = None
+) -> str:
     full_path = build_path(path, params)
     return request_text(PC_BASE_URL + full_path, referer=referer or PC_BASE_URL + "/")
 
 
 def wisereport_text(path: str, params: dict[str, Any] | None = None) -> str:
-    return request_text(WISEREPORT_BASE_URL + build_path(path, params), referer=PC_BASE_URL + "/")
+    return request_text(
+        WISEREPORT_BASE_URL + build_path(path, params), referer=PC_BASE_URL + "/"
+    )
 
 
 def extract_tables(markup: str) -> list[dict[str, Any]]:
@@ -244,7 +285,12 @@ def table_to_records(rows: list[list[str]]) -> list[dict[str, str]]:
         if not any(cell.strip() for cell in row):
             continue
         padded = row + [""] * max(0, len(header) - len(row))
-        records.append({header[idx]: clean_cell(value) for idx, value in enumerate(padded[: len(header)])})
+        records.append(
+            {
+                header[idx]: clean_cell(value)
+                for idx, value in enumerate(padded[: len(header)])
+            }
+        )
     return records
 
 
@@ -276,7 +322,9 @@ def add_output_argument(parser: argparse.ArgumentParser) -> None:
 
 
 def add_limit_argument(parser: argparse.ArgumentParser, default: int = 10) -> None:
-    parser.add_argument("--limit", type=int, default=default, help="Maximum rows/items to include")
+    parser.add_argument(
+        "--limit", type=int, default=default, help="Maximum rows/items to include"
+    )
 
 
 def _query_value(value: Any) -> str:

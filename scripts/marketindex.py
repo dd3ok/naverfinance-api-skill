@@ -69,12 +69,20 @@ def fetch_marketindex(kind: str, *, code: str | None, page: int, limit: int) -> 
         return {
             "source": "finance.naver.com public marketindex page",
             "kind": kind,
-            "marketIndexes": _extract_links(html, "/marketindex/")[:limit] if limit else _extract_links(html, "/marketindex/"),
-            "news": _extract_links(html, "/news/news_read.naver")[:limit] if limit else _extract_links(html, "/news/news_read.naver"),
-            "research": _extract_links(html, "/research/")[:limit] if limit else _extract_links(html, "/research/"),
+            "marketIndexes": _extract_links(html, "/marketindex/")[:limit]
+            if limit
+            else _extract_links(html, "/marketindex/"),
+            "news": _extract_links(html, "/news/news_read.naver")[:limit]
+            if limit
+            else _extract_links(html, "/news/news_read.naver"),
+            "research": _extract_links(html, "/research/")[:limit]
+            if limit
+            else _extract_links(html, "/research/"),
         }
     if kind == "exchange-list":
-        return _fetch_tables("/marketindex/exchangeList.naver", {}, kind=kind, page=page, limit=limit)
+        return _fetch_tables(
+            "/marketindex/exchangeList.naver", {}, kind=kind, page=page, limit=limit
+        )
     if kind == "api-prices":
         if not code:
             raise SystemExit("--code is required for --kind api-prices")
@@ -92,7 +100,10 @@ def fetch_api_prices(code: str, *, page: int, limit: int) -> dict:
     group, api_code = _api_marketindex_route(code)
     payload = request_json_url(
         STOCK_API_BASE_URL
-        + build_path(f"/marketindex/{group}/{api_code}/prices", {"page": page, "pageSize": limit or 10}),
+        + build_path(
+            f"/marketindex/{group}/{api_code}/prices",
+            {"page": page, "pageSize": limit or 10},
+        ),
         referer="https://m.stock.naver.com/",
     )
     if isinstance(payload, list):
@@ -101,12 +112,18 @@ def fetch_api_prices(code: str, *, page: int, limit: int) -> dict:
         rows = payload.get("prices")
         if rows is None:
             if _is_marketindex_error_payload(payload):
-                raise RuntimeError(f"Unexpected marketindex prices payload for {code}: {payload!r}")
+                raise RuntimeError(
+                    f"Unexpected marketindex prices payload for {code}: {payload!r}"
+                )
             rows = [payload]
         elif not isinstance(rows, list):
-            raise RuntimeError(f"Unexpected marketindex prices payload for {code}: {payload!r}")
+            raise RuntimeError(
+                f"Unexpected marketindex prices payload for {code}: {payload!r}"
+            )
     else:
-        raise RuntimeError(f"Unexpected marketindex prices payload for {code}: {payload!r}")
+        raise RuntimeError(
+            f"Unexpected marketindex prices payload for {code}: {payload!r}"
+        )
     return {
         "source": "api.stock.naver.com public marketindex JSON",
         "kind": "api-prices",
@@ -142,7 +159,10 @@ def _is_marketindex_error_payload(payload: dict) -> bool:
         return True
     if "error" in payload or "detailCode" in payload:
         return True
-    has_price_shape = any(key in payload for key in ("closePrice", "localTradedAt", "openPrice", "highPrice", "lowPrice"))
+    has_price_shape = any(
+        key in payload
+        for key in ("closePrice", "localTradedAt", "openPrice", "highPrice", "lowPrice")
+    )
     return "message" in payload and not has_price_shape
 
 
@@ -181,17 +201,28 @@ def _fetch_tables(path: str, params: dict, *, kind: str, page: int, limit: int) 
                     "rows": records[:limit] if limit else records,
                 }
             )
-    return {"source": "finance.naver.com public marketindex HTML table", "kind": kind, "page": page, "tables": tables[:limit] if limit else tables}
+    return {
+        "source": "finance.naver.com public marketindex HTML table",
+        "kind": kind,
+        "page": page,
+        "tables": tables[:limit] if limit else tables,
+    }
 
 
 def _clean_records(records: list[dict[str, str]]) -> list[dict[str, str]]:
-    return [record for record in records if any(re.search(r"\d", value) for value in record.values())]
+    return [
+        record
+        for record in records
+        if any(re.search(r"\d", value) for value in record.values())
+    ]
 
 
 def _extract_links(html: str, contains: str) -> list[dict[str, str]]:
     links = []
     seen = set()
-    for href, body in re.findall(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, flags=re.S):
+    for href, body in re.findall(
+        r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, flags=re.S
+    ):
         if contains not in href:
             continue
         label = clean_cell(strip_tags(body))
@@ -204,13 +235,27 @@ def _extract_links(html: str, contains: str) -> list[dict[str, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--kind", choices=["overview", "exchange-list", "detail", "api-detail", "api-prices"], default="overview")
-    parser.add_argument("--code", help="Market index code, e.g. FX_USDKRW, FX_USDJPY, FX_USDX, OIL_CL, CMDT_GC, IRR_CD91")
+    parser.add_argument(
+        "--kind",
+        choices=["overview", "exchange-list", "detail", "api-detail", "api-prices"],
+        default="overview",
+    )
+    parser.add_argument(
+        "--code",
+        help="Market index code, e.g. FX_USDKRW, FX_USDJPY, FX_USDX, OIL_CL, CMDT_GC, IRR_CD91",
+    )
     parser.add_argument("--page", type=int, default=1)
     add_limit_argument(parser, default=10)
     add_output_argument(parser)
     args = parser.parse_args()
-    emit_output(render_json(fetch_marketindex(args.kind, code=args.code, page=args.page, limit=args.limit)), args.output)
+    emit_output(
+        render_json(
+            fetch_marketindex(
+                args.kind, code=args.code, page=args.page, limit=args.limit
+            )
+        ),
+        args.output,
+    )
     return 0
 
 

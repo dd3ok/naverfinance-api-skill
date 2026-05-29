@@ -142,7 +142,15 @@ def fetch_ranking(kind: str, *, market: str, page: int, limit: int) -> dict:
 
     path = KIND_PATHS[kind]
     params: dict[str, str | int] = {"page": page}
-    if kind in {"market-cap", "volume", "rise", "fall", "steady", "quant-high", "quant-low"}:
+    if kind in {
+        "market-cap",
+        "volume",
+        "rise",
+        "fall",
+        "steady",
+        "quant-high",
+        "quant-low",
+    }:
         params["sosok"] = MARKETS[market]
     if kind == "market-cap":
         params["fieldIds"] = "market_sum"
@@ -172,7 +180,9 @@ def fetch_group_detail(kind: str, no: str, *, page: int, limit: int) -> dict:
         raise SystemExit("--detail-no is supported only for theme, upjong, and group")
     if not no.isdigit():
         raise SystemExit("--detail-no must be numeric")
-    html = pc_text("/sise/sise_group_detail.naver", {"type": kind, "no": no, "page": page})
+    html = pc_text(
+        "/sise/sise_group_detail.naver", {"type": kind, "no": no, "page": page}
+    )
     code_by_name = _extract_stock_code_links(html)
     rows = []
     for table in extract_tables(html):
@@ -245,7 +255,11 @@ def fetch_dividend(*, page: int, limit: int) -> dict:
             },
             referer_path="/domestic/home/dividend/revenue",
         )
-        rows = payload.get("dividends", payload.get("stocks", payload)) if isinstance(payload, dict) else payload
+        rows = (
+            payload.get("dividends", payload.get("stocks", payload))
+            if isinstance(payload, dict)
+            else payload
+        )
         rows = _require_rows_list("dividend", rows)
         return {
             "source": "m.stock.naver.com public front-api JSON",
@@ -274,7 +288,11 @@ def fetch_etf(*, page: int, limit: int) -> dict:
             {"sortTypeCode": "aum", "page": page, "pageSize": limit or 20},
             referer_path="/domestic/home/etf/aum",
         )
-        rows = payload.get("etfs", payload.get("stocks", payload.get("result", payload))) if isinstance(payload, dict) else payload
+        rows = (
+            payload.get("etfs", payload.get("stocks", payload.get("result", payload)))
+            if isinstance(payload, dict)
+            else payload
+        )
         rows = _require_rows_list("etf", rows)
         return {
             "source": "m.stock.naver.com public front-api JSON",
@@ -303,7 +321,11 @@ def fetch_sector_list(kind: str, *, page: int, limit: int) -> dict:
         },
         referer_path=f"/domestic/home/{kind}/daily",
     )
-    rows = payload.get("sectors", payload.get("result", payload)) if isinstance(payload, dict) else payload
+    rows = (
+        payload.get("sectors", payload.get("result", payload))
+        if isinstance(payload, dict)
+        else payload
+    )
     rows = _require_rows_list(kind, rows)
     rows = _with_sector_detail_links(kind, rows)
     return {
@@ -325,7 +347,12 @@ def _with_sector_detail_links(kind: str, rows):
         if not detail_no:
             continue
         row.setdefault("detailNo", detail_no)
-        row.setdefault("detailUrl", build_path("/sise/sise_group_detail.naver", {"type": kind, "no": detail_no}))
+        row.setdefault(
+            "detailUrl",
+            build_path(
+                "/sise/sise_group_detail.naver", {"type": kind, "no": detail_no}
+            ),
+        )
     return rows
 
 
@@ -373,7 +400,9 @@ def fetch_link_only_menu(kind: str) -> dict:
             "note": "Naver embeds KRX short-selling statistics in an iframe; use the iframe URL for current detail data.",
         }
     links = []
-    for href, body in re.findall(r'<a[^>]+href="([^"]*report\.naver[^"]*)"[^>]*>(.*?)</a>', html, flags=re.S):
+    for href, body in re.findall(
+        r'<a[^>]+href="([^"]*report\.naver[^"]*)"[^>]*>(.*?)</a>', html, flags=re.S
+    ):
         text = clean_cell(strip_tags(body))
         if text:
             links.append({"label": text, "url": href})
@@ -403,7 +432,9 @@ def _extract_menu_rows(kind: str, html: str) -> list[dict[str, str]]:
         classes = set((attrs.get("class") or "").split())
         if classes.intersection({"item_list", "type_r1", "Nnavi"}):
             continue
-        if not classes.intersection({"type_1", "type_2", "type_5", "type_7", "table_kos_index"}):
+        if not classes.intersection(
+            {"type_1", "type_2", "type_5", "type_7", "table_kos_index"}
+        ):
             continue
         records = table_to_records(table["rows"])
         if not records:
@@ -432,7 +463,9 @@ def _is_generic_menu_table(first_record: dict[str, str]) -> bool:
     )
 
 
-def _clean_kind_records(kind: str, records: list[dict[str, str]]) -> list[dict[str, str]]:
+def _clean_kind_records(
+    kind: str, records: list[dict[str, str]]
+) -> list[dict[str, str]]:
     if kind in {"deposit", "investor-trend", "program-trend"}:
         return _drop_header_like_rows(records)
     if kind not in {"theme", "upjong", "group"}:
@@ -458,10 +491,14 @@ def _drop_header_like_rows(records: list[dict[str, str]]) -> list[dict[str, str]
 
 
 def _has_numeric_change(record: dict[str, str]) -> bool:
-    return any("%" in value or value.startswith(("+", "-")) for value in record.values())
+    return any(
+        "%" in value or value.startswith(("+", "-")) for value in record.values()
+    )
 
 
-def _fetch_iframe_table(kind: str, path: str, params: dict[str, str | int], *, limit: int) -> dict:
+def _fetch_iframe_table(
+    kind: str, path: str, params: dict[str, str | int], *, limit: int
+) -> dict:
     html = pc_text(path, params)
     rows = _extract_menu_rows(kind, html)
     return {
@@ -500,14 +537,18 @@ def _extract_group_detail_links(html: str, kind: str) -> dict[str, dict[str, str
 
 def _extract_stock_code_links(html: str) -> dict[str, dict[str, str]]:
     links = {}
-    pattern = r'<a[^>]+href="([^"]*/item/main\.naver\?code=(\d{6})[^"]*)"[^>]*>(.*?)</a>'
+    pattern = (
+        r'<a[^>]+href="([^"]*/item/main\.naver\?code=(\d{6})[^"]*)"[^>]*>(.*?)</a>'
+    )
     for url, code, body in re.findall(pattern, html, flags=re.S):
         name = clean_cell(strip_tags(body))
         links[name] = {"code": code, "itemUrl": url}
     return links
 
 
-def _records_from_detail_rows(rows: list[list[str]], code_by_name: dict[str, dict[str, str]]) -> list[dict[str, str]]:
+def _records_from_detail_rows(
+    rows: list[list[str]], code_by_name: dict[str, dict[str, str]]
+) -> list[dict[str, str]]:
     header = next((row for row in rows if row and row[0] == "종목명"), [])
     if not header:
         return []
@@ -519,7 +560,9 @@ def _records_from_detail_rows(rows: list[list[str]], code_by_name: dict[str, dic
             keys = [header[0], "편입사유", *header[1:]]
         else:
             keys = header
-        record = {keys[idx]: clean_cell(value) for idx, value in enumerate(row[: len(keys)])}
+        record = {
+            keys[idx]: clean_cell(value) for idx, value in enumerate(row[: len(keys)])
+        }
         link = code_by_name.get(record.get("종목명", ""))
         if link:
             record.update(link)
@@ -539,14 +582,20 @@ def main() -> int:
     parser.add_argument("--kind", choices=sorted(KIND_PATHS), default="market-cap")
     parser.add_argument("--market", choices=sorted(MARKETS), default="kospi")
     parser.add_argument("--page", type=int, default=1)
-    parser.add_argument("--detail-no", help="Fetch stocks for a theme/upjong/group detail number")
+    parser.add_argument(
+        "--detail-no", help="Fetch stocks for a theme/upjong/group detail number"
+    )
     add_limit_argument(parser, default=20)
     add_output_argument(parser)
     args = parser.parse_args()
     if args.detail_no:
-        payload = fetch_group_detail(args.kind, args.detail_no, page=args.page, limit=args.limit)
+        payload = fetch_group_detail(
+            args.kind, args.detail_no, page=args.page, limit=args.limit
+        )
     else:
-        payload = fetch_ranking(args.kind, market=args.market, page=args.page, limit=args.limit)
+        payload = fetch_ranking(
+            args.kind, market=args.market, page=args.page, limit=args.limit
+        )
     emit_output(render_json(payload), args.output)
     return 0
 

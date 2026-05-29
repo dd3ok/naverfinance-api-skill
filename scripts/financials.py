@@ -37,7 +37,10 @@ def fetch_financials(code: str, *, kind: str, limit: int) -> dict:
     markup = wisereport_text(KIND_PATHS[kind], {"cmp_cd": code})
     bullets = [
         clean_cell(strip_tags(match))
-        for match in re.findall(r"(?is)<li[^>]+class=['\"][^'\"]*dot_cmp[^'\"]*['\"][^>]*>(.*?)</li>", markup)
+        for match in re.findall(
+            r"(?is)<li[^>]+class=['\"][^'\"]*dot_cmp[^'\"]*['\"][^>]*>(.*?)</li>",
+            markup,
+        )
     ]
     tables = []
     for table in extract_tables(markup):
@@ -60,7 +63,10 @@ def main() -> int:
     add_limit_argument(parser, default=5)
     add_output_argument(parser)
     args = parser.parse_args()
-    emit_output(render_json(fetch_financials(args.code, kind=args.kind, limit=args.limit)), args.output)
+    emit_output(
+        render_json(fetch_financials(args.code, kind=args.kind, limit=args.limit)),
+        args.output,
+    )
     return 0
 
 
