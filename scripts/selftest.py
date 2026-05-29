@@ -114,13 +114,20 @@ class _FakeResponse:
         return self._body
 
 
+def _raise_network_should_not_be_reached(message: str):
+    def _mock_urlopen(*args, **kwargs):
+        raise AssertionError(message)
+
+    return _mock_urlopen
+
+
 def test_request_bytes_rejects_non_public_hosts() -> None:
     import naverfinance_api
 
     original = naverfinance_api.urllib.request.urlopen
-    naverfinance_api.urllib.request.urlopen = lambda *args, **kwargs: (
-        _ for _ in ()
-    ).throw(AssertionError("network should not be reached for blocked hosts"))
+    naverfinance_api.urllib.request.urlopen = _raise_network_should_not_be_reached(
+        "network should not be reached for blocked hosts"
+    )
     try:
         try:
             naverfinance_api.request_bytes("https://example.com/public.json")
@@ -136,13 +143,15 @@ def test_request_bytes_rejects_sensitive_markers() -> None:
     import naverfinance_api
 
     original = naverfinance_api.urllib.request.urlopen
-    naverfinance_api.urllib.request.urlopen = lambda *args, **kwargs: (
-        _ for _ in ()
-    ).throw(AssertionError("network should not be reached for sensitive URLs"))
+    naverfinance_api.urllib.request.urlopen = _raise_network_should_not_be_reached(
+        "network should not be reached for sensitive URLs"
+    )
     blocked = [
+        "https://finance.naver.com/login.naver",
         "https://m.stock.naver.com/front-api/my/holding",
         "https://finance.naver.com/api/order/list",
         "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?auth_token=secret",
+        "https://polling.finance.naver.com/api/realtime?query=SERVICE_MYSTOCK_ITEM:005930",
     ]
     try:
         for url in blocked:
@@ -226,7 +235,9 @@ def test_release_checklist_covers_public_skill_surface() -> None:
         "unofficial",
     ]
     for marker in required:
-        assert marker in text
+        assert marker in text, (
+            f"Required marker {marker!r} is missing from RELEASE_CHECKLIST.md"
+        )
 
 
 def test_theme_and_upjong_tables_are_selected() -> None:

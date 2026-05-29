@@ -35,13 +35,21 @@ SENSITIVE_PATH_MARKERS = {
     "account",
     "auth",
     "balance",
+    "broker",
+    "comment",
     "cookie",
+    "discussion",
     "holding",
+    "login",
     "my",
+    "mystock",
+    "opentalk",
     "order",
     "payment",
+    "profile",
     "token",
     "userinfo",
+    "wts",
 }
 SENSITIVE_QUERY_KEYS = SENSITIVE_PATH_MARKERS | {
     "access_token",
@@ -54,6 +62,11 @@ SENSITIVE_QUERY_KEYS = SENSITIVE_PATH_MARKERS | {
     "refresh_token",
     "refreshtoken",
     "user_info",
+}
+SENSITIVE_QUERY_VALUE_MARKERS = {
+    "mystock",
+    "personalized",
+    "servicemystockitem",
 }
 
 
@@ -123,10 +136,10 @@ def _validate_public_url(url: str) -> None:
     if path_markers:
         joined = ", ".join(sorted(path_markers))
         raise RuntimeError(f"Blocked sensitive Naver URL path marker: {joined}")
-    query_markers = _sensitive_query_keys(parsed.query)
+    query_markers = _sensitive_query_markers(parsed.query)
     if query_markers:
         joined = ", ".join(sorted(query_markers))
-        raise RuntimeError(f"Blocked sensitive Naver URL query key: {joined}")
+        raise RuntimeError(f"Blocked sensitive Naver URL query marker: {joined}")
 
 
 def _sensitive_path_markers(path: str) -> set[str]:
@@ -145,13 +158,23 @@ def _sensitive_path_markers(path: str) -> set[str]:
     return markers
 
 
-def _sensitive_query_keys(query: str) -> set[str]:
+def _sensitive_query_markers(query: str) -> set[str]:
     markers: set[str] = set()
-    for key, _value in urllib.parse.parse_qsl(query, keep_blank_values=True):
+    for key, value in urllib.parse.parse_qsl(query, keep_blank_values=True):
         lowered = key.lower()
         compact = re.sub(r"[^a-z0-9]", "", lowered)
         if lowered in SENSITIVE_QUERY_KEYS or compact in SENSITIVE_QUERY_KEYS:
             markers.add(lowered)
+        value_lowered = value.lower()
+        value_compact = re.sub(r"[^a-z0-9]", "", value_lowered)
+        value_tokens = {
+            token for token in re.split(r"[^a-z0-9]+", value_lowered) if token
+        }
+        for marker in SENSITIVE_QUERY_VALUE_MARKERS:
+            if marker in value_compact or marker in value_tokens:
+                markers.add(marker)
+        if "my" in value_tokens:
+            markers.add("my")
     return markers
 
 
