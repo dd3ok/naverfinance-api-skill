@@ -11,10 +11,11 @@
 ## 지원 범위
 
 - 국내 종목 요약, 현재가, 주요 지표, 차트, 투자자별 매매 동향
+- 증권 홈 요약, TOP 종목, KRX/NXT 홈 위젯, NXT 장상태
 - 종목 뉴스와 공개 공시 목록
 - `/sise/` 국내 시장 메뉴: 시가총액, 거래량, 상승/하락, KONEX, NXT, ETF, ETN, 배당, 인기검색, 투자자/프로그램 매매, 외국인/기관 순매수, 테마, 업종, 그룹, 관련 종목 상세
 - `/world/` 개요, 해외 지수 상세 표, 해외 거래시간
-- `/marketindex/` 개요, 환율 목록, FX, 금리, 유가, 금, 원자재 상세 페이지
+- `/marketindex/` 개요, 환율 목록, FX, 금리, 유가, 금, 원자재 상세 페이지. `api.stock.naver.com/marketindex` JSON은 FX/국제환율/달러인덱스/energy/metals를 우선 사용하고, 금리 등 legacy-only 메뉴는 PC detail page를 사용합니다.
 - `/research/` 리포트 목록과 상세 링크
 - `/news/` 카테고리, 공지, legacy 뉴스 검색
 - 네이버 종목분석 iframe으로 노출되는 Wisereport 기업분석 HTML 표
@@ -34,7 +35,7 @@ https://github.com/dd3ok/naverfinance-api-skill 에서 스킬을 설치해줘.
 수동 설치 또는 symlink도 가능합니다.
 
 ```bash
-CODEX_SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+CODEX_SKILLS_DIR="$HOME/.agents/skills"
 mkdir -p "$CODEX_SKILLS_DIR"
 git clone --depth 1 https://github.com/dd3ok/naverfinance-api-skill.git "$CODEX_SKILLS_DIR/naverfinance-web-api"
 ```
@@ -42,10 +43,12 @@ git clone --depth 1 https://github.com/dd3ok/naverfinance-api-skill.git "$CODEX_
 이미 clone한 작업 디렉터리를 쓰고 싶다면 symlink로 노출합니다.
 
 ```bash
-CODEX_SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+CODEX_SKILLS_DIR="$HOME/.agents/skills"
 mkdir -p "$CODEX_SKILLS_DIR"
 ln -sfn /path/to/naverfinance-api-skill "$CODEX_SKILLS_DIR/naverfinance-web-api"
 ```
+
+Repository-scoped installs can use `.agents/skills/naverfinance-web-api/` under the project root.
 
 ### Claude Code
 
@@ -69,8 +72,17 @@ git clone --depth 1 https://github.com/dd3ok/naverfinance-api-skill.git .claude/
 
 Gemini CLI에서도 같은 `SKILL.md` 패키지를 Agent Skill로 연결할 수 있습니다.
 
+Interactive Gemini CLI sessions can use:
+
+```text
+/skills link /path/to/naverfinance-api-skill
+```
+
+Terminal installs can use a local directory or Git repository:
+
 ```bash
-gemini skills link /path/to/naverfinance-api-skill
+gemini skills install /path/to/naverfinance-api-skill --consent
+gemini skills install https://github.com/dd3ok/naverfinance-api-skill.git --consent
 ```
 
 ### 로컬 스크립트만
@@ -88,15 +100,22 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/selftest.py
 저장소 루트에서 스크립트를 직접 실행합니다.
 
 ```bash
+python3 scripts/home.py --limit 5
 python3 scripts/stock_summary.py --code 005930
 python3 scripts/quote.py --code 005930 --code 000660
+python3 scripts/quote.py --index KOSPI --index KOSDAQ --index KPI200
 python3 scripts/stock_chart.py --code 005930 --period day --start 20260420 --end 20260427
 python3 scripts/stock_trend.py --code 005930 --limit 10
 python3 scripts/news.py --code 005930 --kind stock --limit 5
 python3 scripts/market_ranking.py --kind market-cap --market kospi --page 1 --limit 10
+python3 scripts/market_ranking.py --kind upjong --limit 10
 python3 scripts/market_ranking.py --kind theme --detail-no 318 --limit 10
 python3 scripts/world.py --kind index --symbol nasdaq --limit 5
+python3 scripts/world.py --kind prices --symbol nasdaq --limit 5
 python3 scripts/marketindex.py --kind detail --code FX_USDKRW --limit 3
+python3 scripts/marketindex.py --kind api-prices --code FX_USDKRW --limit 3
+python3 scripts/marketindex.py --kind api-prices --code OIL_CL --limit 3
+python3 scripts/marketindex.py --kind api-prices --code CMDT_GC --limit 3
 python3 scripts/research.py --kind company --page 1 --limit 5
 python3 scripts/financials.py --code 005930 --kind overview
 ```
@@ -160,6 +179,7 @@ KOSPI 시가총액 상위 종목을 네이버 금융 기준으로 보여줘.
 │   └── script-cookbook.md
 └── scripts/
     ├── financials.py
+    ├── home.py
     ├── indices.py
     ├── market_ranking.py
     ├── marketindex.py

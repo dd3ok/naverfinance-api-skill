@@ -17,11 +17,44 @@ from typing import Any
 
 
 MOBILE_BASE_URL = "https://m.stock.naver.com"
+STOCK_API_BASE_URL = "https://api.stock.naver.com"
 PC_BASE_URL = "https://finance.naver.com"
 POLLING_BASE_URL = "https://polling.finance.naver.com"
 WISEREPORT_BASE_URL = "https://navercomp.wisereport.co.kr/v2"
 LEGACY_API_BASE_URL = "https://api.finance.naver.com"
 DEFAULT_TIMEOUT = 30
+ALLOWED_PUBLIC_HOSTS = {
+    "api.finance.naver.com",
+    "api.stock.naver.com",
+    "finance.naver.com",
+    "m.stock.naver.com",
+    "navercomp.wisereport.co.kr",
+    "polling.finance.naver.com",
+}
+SENSITIVE_PATH_MARKERS = {
+    "account",
+    "auth",
+    "balance",
+    "cookie",
+    "holding",
+    "my",
+    "order",
+    "payment",
+    "token",
+    "userinfo",
+}
+SENSITIVE_QUERY_KEYS = SENSITIVE_PATH_MARKERS | {
+    "access_token",
+    "accesstoken",
+    "accountno",
+    "auth_token",
+    "authtoken",
+    "authorization",
+    "orderno",
+    "refresh_token",
+    "refreshtoken",
+    "user_info",
+}
 
 
 def normalize_stock_code(code: str) -> str:
@@ -60,6 +93,7 @@ def request_bytes(
     referer: str | None = None,
     accept: str = "*/*",
 ) -> tuple[bytes, str]:
+    _validate_public_url(url)
     headers = {
         "Accept": accept,
         "User-Agent": "Mozilla/5.0 naverfinance-web-api-skill/1.0",
@@ -74,6 +108,47 @@ def request_bytes(
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:800]
         raise RuntimeError(f"Naver endpoint returned HTTP {exc.code}: {detail}") from exc
+
+
+def _validate_public_url(url: str) -> None:
+    parsed = urllib.parse.urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or host not in ALLOWED_PUBLIC_HOSTS:
+        raise RuntimeError(f"Unsupported Naver public host: {host or parsed.netloc or '<missing>'}")
+    path_markers = _sensitive_path_markers(parsed.path)
+    if path_markers:
+        joined = ", ".join(sorted(path_markers))
+        raise RuntimeError(f"Blocked sensitive Naver URL path marker: {joined}")
+    query_markers = _sensitive_query_keys(parsed.query)
+    if query_markers:
+        joined = ", ".join(sorted(query_markers))
+        raise RuntimeError(f"Blocked sensitive Naver URL query key: {joined}")
+
+
+def _sensitive_path_markers(path: str) -> set[str]:
+    markers: set[str] = set()
+    decoded = urllib.parse.unquote(path).lower()
+    for segment in decoded.split("/"):
+        if not segment:
+            continue
+        compact = re.sub(r"[^a-z0-9]", "", segment)
+        tokens = {segment, compact}
+        tokens.update(token for token in re.split(r"[^a-z0-9]+", segment) if token)
+        markers.update(token for token in tokens if token in SENSITIVE_PATH_MARKERS)
+        for marker in SENSITIVE_PATH_MARKERS - {"my"}:
+            if compact.startswith(marker):
+                markers.add(marker)
+    return markers
+
+
+def _sensitive_query_keys(query: str) -> set[str]:
+    markers: set[str] = set()
+    for key, _value in urllib.parse.parse_qsl(query, keep_blank_values=True):
+        lowered = key.lower()
+        compact = re.sub(r"[^a-z0-9]", "", lowered)
+        if lowered in SENSITIVE_QUERY_KEYS or compact in SENSITIVE_QUERY_KEYS:
+            markers.add(lowered)
+    return markers
 
 
 def request_text(

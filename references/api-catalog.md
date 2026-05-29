@@ -6,6 +6,7 @@
 
 - [Mobile JSON](#mobile-json)
 - [Realtime Polling](#realtime-polling)
+- [api.stock.naver.com Market Index JSON](#apistocknavercom-market-index-json)
 - [Legacy Chart](#legacy-chart)
 - [PC HTML Menus](#pc-html-menus)
 - [Wisereport 기업분석](#wisereport-기업분석)
@@ -16,11 +17,14 @@ Base: `https://m.stock.naver.com/front-api`
 
 | 영역 | Pattern | 메모 |
 | --- | --- | --- |
+| 홈 요약 | `https://finance.naver.com/main/mainSummary.naver` | PC 홈 위젯 JSON. `front-api` base 예외입니다. 주요 key: `topItems`, `nxtTopItems`, `nxtMarketStatus`, `todayIndexItemList`, `todayIndexDealTrendList`, `kospiTrendProgram`, `groupTopList`, `themeTopList`, `searchList`. 현재 public response는 plain JSON입니다. |
 | 국내 종목 basic | `/stock/domestic/basic?code=005930&endType=stock` | 요약 시세, 거래소, chart image URL, NXT over-market 정보. |
 | 국내 종목 integration | `/stock/domestic/integration?code=005930&endType=stock` | 주요 지표, 투자자 동향 sample, research list, 동종 비교, consensus/IR 조각. |
 | 국내 종목 trend | `/stock/domestic/trend?code=005930` | 날짜별 투자자 동향. `scripts/stock_trend.py` 사용. |
 | 국내 공시 | `/stock/domestic/disclosure?code=005930&page=1&pageSize=20` | 공개 공시 목록. |
-| 국내 종목 list | `/stock/domestic/stockList?sortType=marketValue&category=KOSPI&page=1&pageSize=20` | 랭킹/목록. sort에는 `marketValue`, `up`, `down`, `quantTop`, `priceTop`, `searchTop`, `newStock`, `management`, `high52week`, `low52week`, `dividend`, `etf`, `etn`, `konex` 등이 있습니다. |
+| 국내 종목 list | `/stock/domestic/stockList?sortType=marketValue&category=KOSPI&page=1&pageSize=20` | 랭킹/목록. 확인된 sort: `marketValue`, `up`, `down`, `quantTop`, `priceTop`, `searchTop`, `newStock`, `management`, `high52week`, `low52week`. `dividend`, `etf`, `etn`, `konex`, `NXT`는 이 endpoint 조합에 의존하지 말고 전용 endpoint 또는 PC fallback을 사용합니다. |
+| 국내 배당 list | `/domestic/stock/list?sortType=dividend&category=rate&page=1&pageSize=20` | 배당수익률/배당금 목록. 응답 예: `dividends[]` with `itemCode`, `name`, `dividendRate`, `dividendDate`, `endUrl`. |
+| 국내 ETF list | `/domestic/etf/list?sortTypeCode=aum&page=1&pageSize=20` | ETF 목록. `sortTypeCode`: `aum`, `changeRate`, `tradingValue`. 응답 예: `result[]` with `itemCode`, `currentPrice`, `aum`, `returnRate3m`. |
 | 종목/지수 chart | `/chart/domestic/stock/end?code=005930&chartInfoType=item&scriptChartType=candleDay` | `chartInfoType`: `item` 또는 `index`. chart type에는 `day`, `candleMinuteFive`, `candleDay`, `candleWeek`, `candleMonth`, `areaMonthThree`, `areaYear`, `areaYearThree`, `areaYearFive`, `areaYearTen` 등이 있습니다. |
 | 국내 지수 basic | `/stock/domestic/basic?code=KOSPI&endType=index` | 예시 code: `KOSPI`, `KOSDAQ`, `KPI200`. |
 | 국내 지수 integration | `/stock/domestic/integration?code=KOSPI&endType=index` | 지수 상세 요약. |
@@ -35,6 +39,8 @@ Base: `https://m.stock.naver.com/front-api`
 | More ranking | `/market/moreRanking?category=endHit&ageRange=all` | Home ranking card. |
 | 시장 매매 동향 graph | `/market/tradingTrend/graphInfo?periodType=daily&stockExchangeType=KRX` | 투자자 순매수 trend graph. |
 | 시장 매매 동향 ranking | `/market/tradingTrend/ranking?periodType=daily&stockExchangeType=KRX&investorType=foreigner&tradingType=trendBuy&page=1&pageSize=20` | 투자자 매수/매도 ranking. |
+| 섹터/테마/그룹 list | `/stock/sectors/all?nationType=domestic&sectorType=upjong|theme|group&sectorSortType=CHANGE_RATE&businessDayCategory=daily&page=1&pageSize=20` | 구조화된 업종/테마/그룹 목록. 주요 field: `sectorCode`, `sectorName`, `changeRate`, `totalMarketCap`, `risingCount`, `unChangedCount`, `fallingCount`, `items[]`. Wisereport sector 분석과 별개입니다. |
+| 섹터 구성 종목 | `/domestic/sector/item/list?sectorCode=307&sectorType=upjong&sectorSortType=CHANGE_RATE&page=1&pageSize=20` | 특정 업종/테마/그룹 구성 종목. PC `sise_group_detail.naver`의 구조화 대체 후보입니다. |
 | IPO 최근/청약/상세 | `/ipo/recent`, `/ipo/subscribing`, `/ipo/detail?code=A439960` | 공개 IPO 데이터. |
 | 환율 main/list/detail | `/marketIndex/exchange/main`, `/marketIndex/exchange/new`, `/marketIndex/productDetail?category=exchange&reutersCode=FX_USDKRW` | FX widget과 detail. |
 | 원자재 detail | `/marketIndex/productDetail?category=energy&reutersCode=CLcv1` | energy/commodity detail. |
@@ -45,6 +51,24 @@ Base: `https://m.stock.naver.com/front-api`
 Base: `https://polling.finance.naver.com/api/realtime`
 
 `?query=SERVICE_ITEM:005930`은 현재가, 전일 종가, 시가/고가/저가, 거래량/거래대금, EPS/BPS, 선택적 NXT over-market 정보 같은 공개 quote field를 반환합니다. 여러 area는 `|`로 구분하지만 `SERVICE_MYSTOCK_ITEM`은 피합니다.
+
+`?query=SERVICE_INDEX:KOSPI,KOSDAQ,KPI200`은 주요 국내 지수를 한 번에 반환합니다. 지수 field 예: `ms`, `nv`, `cv`, `cr`, `rf`, `ov`, `hv`, `lv`, `aq`, `aa`, `bs`, `cd`.
+
+`SERVICE_ITEM`의 `datas[]`에는 `nxtOverMarketPriceInfo`가 포함될 수 있습니다. 주요 field는 `tradingSessionType`, `overMarketStatus`, `overPrice`, `openPrice`, `highPrice`, `lowPrice`, `compareToPreviousClosePrice`, `fluctuationsRatio`, `localTradedAt`, `accumulatedTradingVolume`, `accumulatedTradingValue`입니다.
+
+## api.stock.naver.com Market Index JSON
+
+Base: `https://api.stock.naver.com`
+
+| 영역 | Pattern | 메모 |
+| --- | --- | --- |
+| 환전 고시 환율 list/detail | `/marketindex/exchange`, `/marketindex/exchange/FX_USDKRW` | UTF-8 JSON. `categoryType`, `reutersCode`, `symbolCode`, `name`, `localTradedAt`, `closePrice`, `fluctuations`, `fluctuationsRatio`, `fluctuationsType`, `marketStatus`, `unit`, `degreeCount`, `imageCharts`, `endUrl`, `chartIqEndUrl`. |
+| 환전 고시 일별 가격 | `/marketindex/exchange/FX_USDKRW/prices?page=1&pageSize=10` | `cashBuyValue`, `cashSellValue`, `sendValue`, `receiveValue` 포함. |
+| 국제 시장 환율 list/detail | `/marketindex/exchangeWorld`, `/marketindex/exchangeWorld/USDJPY` | PC `worldExchangeDetail.naver`의 구조화 대체 후보입니다. |
+| 국제 시장 환율 가격 | `/marketindex/exchangeWorld/USDJPY/prices?page=1&pageSize=10` | `openPrice`, `highPrice`, `lowPrice` 포함. |
+| 달러 인덱스 | `/marketindex/exchange/.DXY`, `/marketindex/exchange/.DXY/prices?page=1&pageSize=10` | PC marketindex 우측 달러 인덱스와 대응됩니다. |
+| 에너지 list/detail/가격 | `/marketindex/energy`, `/marketindex/energy/CLcv1`, `/marketindex/energy/CLcv1/prices?page=1&pageSize=10` | 대표 alias: `OIL_CL -> CLcv1`, `OIL_BRT -> LCOcv1`, `OIL_DU -> DCBc1`, `OIL_GSL -> OIL_GSL`, `OIL_LO -> OIL_LO`. |
+| 금속 list/detail/가격 | `/marketindex/metals`, `/marketindex/metals/GCcv1`, `/marketindex/metals/GCcv1/prices?page=1&pageSize=10` | 대표 alias: `CMDT_GC -> GCcv1`, `GOLD_KRX -> M04020000`, `CMDT_SI -> SIcv1`, `CMDT_HG -> HGcv1`. |
 
 ## Legacy Chart
 
@@ -82,7 +106,7 @@ Base: `https://finance.naver.com`
 | 프로그램 매매 | `/sise/sise_program.naver?sosok=01`, `/sise/programDealTrendDay.naver?bizdate=YYYYMMDD&sosok=01` |
 | 자금 흐름/신규 상장 | `/sise/sise_deposit.naver`, `/sise/sise_new_stock.naver` |
 | 장외/IPO | `/sise/market3news_list.naver`, `/sise/ipo.naver` |
-| NXT 목록 | `/sise/nxt_sise_market_sum.naver`, `/sise/nxt_sise_quant.naver`, `/sise/nxt_sise_rise.naver`, `/sise/nxt_sise_fall.naver` |
+| NXT 목록 | `/sise/nxt_sise_market_sum.naver`, `/sise/nxt_sise_quant.naver`, `/sise/nxt_sise_rise.naver`, `/sise/nxt_sise_fall.naver` | NXT는 현재 모바일 `stockList` category로 직접 조회하지 말고 PC HTML table을 사용합니다. |
 | 관리/거래정지/투자경고 | `/sise/management.naver`, `/sise/trading_halt.naver`, `/sise/investment_alert.naver?type=caution` |
 | 인기검색 | `/sise/lastsearch2.naver` |
 | 기술적 신호 | `/sise/item_gold.naver`, `/sise/item_gap.naver`, `/sise/item_igyuk.naver`, `/sise/item_overheating_1.naver`, `/sise/item_overheating_2.naver` |
@@ -92,6 +116,7 @@ Base: `https://finance.naver.com`
 | 환율 상세 | `/marketindex/exchangeDetail.naver?marketindexCd=FX_USDKRW` |
 | 금리/유가/금/원자재 | `/marketindex/interestDetail.naver`, `/marketindex/worldExchangeDetail.naver`, `/marketindex/worldOilDetail.naver`, `/marketindex/oilDetail.naver`, `/marketindex/worldGoldDetail.naver`, `/marketindex/goldDetail.naver`, `/marketindex/materialDetail.naver` |
 | World 개요/지수/시간 | `/world/`, `/world/sise.naver?symbol=NAS@IXIC&fdtc=0`, `/world/guide_time_list.naver`, `/world/guide_time_chart.naver` |
+| World 지수 일별 JSON | `/world/worldDayListJson.naver?symbol=NAS@IXIC&fdtc=0&page=1` | `fdtc`를 포함해야 안정적으로 JSON이 반환됩니다. field: `symb`, `xymd`, `open`, `high`, `low`, `clos`, `diff`, `rate`, `gvol`. |
 | 리서치 report | `/research/market_info_list.naver`, `/research/invest_list.naver`, `/research/company_list.naver`, `/research/industry_list.naver`, `/research/economy_list.naver`, `/research/debenture_list.naver` |
 | 뉴스 메뉴 | `/news/news_list.naver`, `/news/mainnews.naver`, `/news/market_notice.naver`, `/news/news_search.naver`, `/news/news_read.naver` |
 
