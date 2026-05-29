@@ -16,5 +16,15 @@ jobs:
           python-version: "3.x"
       - name: Compile scripts
         run: python -m compileall -q scripts
+      - name: Check script help commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in scripts/*.py; do
+            if [[ "$(basename "$file")" == "naverfinance_api.py" || "$(basename "$file")" == "selftest.py" ]]; then
+              continue
+            fi
+            python "$file" --help >/dev/null
+          done
       - name: Run selftest
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/selftest.py

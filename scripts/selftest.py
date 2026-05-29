@@ -41,6 +41,9 @@ def main() -> int:
         assert result.returncode == 0, f"{script.name} --help failed: {result.stderr}"
 
     test_front_json_rejects_error_payload()
+    test_request_bytes_rejects_non_public_hosts()
+    test_request_bytes_rejects_sensitive_markers()
+    test_request_bytes_allows_public_naver_hosts()
     test_theme_and_upjong_tables_are_selected()
     test_group_rows_include_detail_links()
     test_group_detail_stocks_are_selected()
@@ -60,6 +63,7 @@ def main() -> int:
     test_marketindex_api_prices_are_selected()
     test_marketindex_api_routes_fx_energy_and_metals()
     test_marketindex_rejects_unsafe_api_path_segments()
+    test_marketindex_api_prices_reject_error_payloads()
     test_world_prices_use_world_day_json()
     test_dividend_and_etf_use_current_mobile_endpoints()
     test_sector_lists_use_current_mobile_endpoint()
@@ -90,6 +94,85 @@ def test_front_json_rejects_error_payload() -> None:
             raise AssertionError("front_json should reject Naver error payloads")
     finally:
         naverfinance_api.mobile_json = original
+
+
+class _FakeResponse:
+    def __init__(self, body: bytes = b"{}", content_type: str = "application/json"):
+        self._body = body
+        self.headers = {"Content-Type": content_type}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_request_bytes_rejects_non_public_hosts() -> None:
+    import naverfinance_api
+
+    original = naverfinance_api.urllib.request.urlopen
+    naverfinance_api.urllib.request.urlopen = lambda *args, **kwargs: (_ for _ in ()).throw(
+        AssertionError("network should not be reached for blocked hosts")
+    )
+    try:
+        try:
+            naverfinance_api.request_bytes("https://example.com/public.json")
+        except RuntimeError as exc:
+            assert "Unsupported Naver public host" in str(exc)
+        else:
+            raise AssertionError("non-Naver hosts should be rejected before request")
+    finally:
+        naverfinance_api.urllib.request.urlopen = original
+
+
+def test_request_bytes_rejects_sensitive_markers() -> None:
+    import naverfinance_api
+
+    original = naverfinance_api.urllib.request.urlopen
+    naverfinance_api.urllib.request.urlopen = lambda *args, **kwargs: (_ for _ in ()).throw(
+        AssertionError("network should not be reached for sensitive URLs")
+    )
+    blocked = [
+        "https://m.stock.naver.com/front-api/my/holding",
+        "https://finance.naver.com/api/order/list",
+        "https://api.stock.naver.com/marketindex/exchange/FX_USDKRW/prices?auth_token=secret",
+    ]
+    try:
+        for url in blocked:
+            try:
+                naverfinance_api.request_bytes(url)
+            except RuntimeError as exc:
+                assert "sensitive" in str(exc).lower()
+            else:
+                raise AssertionError(f"sensitive URL should be rejected before request: {url}")
+    finally:
+        naverfinance_api.urllib.request.urlopen = original
+
+
+def test_request_bytes_allows_public_naver_hosts() -> None:
+    import naverfinance_api
+
+    original = naverfinance_api.urllib.request.urlopen
+    calls = []
+
+    def fake_urlopen(req, timeout=None):
+        calls.append(req.full_url)
+        return _FakeResponse(b"ok", "text/plain; charset=utf-8")
+
+    naverfinance_api.urllib.request.urlopen = fake_urlopen
+    try:
+        body, content_type = naverfinance_api.request_bytes(
+            "https://finance.naver.com/main/mainSummary.naver?sortOrder=desc"
+        )
+        assert body == b"ok"
+        assert "text/plain" in content_type
+        assert calls == ["https://finance.naver.com/main/mainSummary.naver?sortOrder=desc"]
+    finally:
+        naverfinance_api.urllib.request.urlopen = original
 
 
 def test_skill_description_is_short_and_positive() -> None:
@@ -516,6 +599,22 @@ def test_marketindex_rejects_unsafe_api_path_segments() -> None:
             assert "format" in str(exc)
         else:
             raise AssertionError(f"{code} should not be accepted as a marketindex path segment")
+
+
+def test_marketindex_api_prices_reject_error_payloads() -> None:
+    import marketindex
+
+    original = marketindex.request_json_url
+    marketindex.request_json_url = lambda *args, **kwargs: {"error": "invalid", "message": "wrong code"}
+    try:
+        try:
+            marketindex.fetch_marketindex("api-prices", code="FX_USDKRW", page=1, limit=1)
+        except RuntimeError as exc:
+            assert "marketindex prices" in str(exc)
+        else:
+            raise AssertionError("marketindex error payloads should not be returned as rows")
+    finally:
+        marketindex.request_json_url = original
 
 
 def test_world_prices_use_world_day_json() -> None:

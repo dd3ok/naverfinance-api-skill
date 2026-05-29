@@ -100,7 +100,11 @@ def fetch_api_prices(code: str, *, page: int, limit: int) -> dict:
     elif isinstance(payload, dict):
         rows = payload.get("prices")
         if rows is None:
+            if _is_marketindex_error_payload(payload):
+                raise RuntimeError(f"Unexpected marketindex prices payload for {code}: {payload!r}")
             rows = [payload]
+        elif not isinstance(rows, list):
+            raise RuntimeError(f"Unexpected marketindex prices payload for {code}: {payload!r}")
     else:
         raise RuntimeError(f"Unexpected marketindex prices payload for {code}: {payload!r}")
     return {
@@ -128,6 +132,18 @@ def fetch_api_detail(code: str) -> dict:
         "apiCode": api_code,
         "payload": payload,
     }
+
+
+def _is_marketindex_error_payload(payload: dict) -> bool:
+    if payload.get("isSuccess") is False:
+        return True
+    result_code = payload.get("resultCode")
+    if result_code and str(result_code).lower() not in {"success", "ok"}:
+        return True
+    if "error" in payload or "detailCode" in payload:
+        return True
+    has_price_shape = any(key in payload for key in ("closePrice", "localTradedAt", "openPrice", "highPrice", "lowPrice"))
+    return "message" in payload and not has_price_shape
 
 
 def _api_marketindex_route(code: str) -> tuple[str, str]:
