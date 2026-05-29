@@ -1,4 +1,4 @@
 interface:
   display_name: "Naver Finance Web API"
   short_description: "비공식 read-only Naver Finance/Npay Stock 공개 데이터"
-  default_prompt: "$naverfinance-web-api를 사용해 공개 Naver Finance/Npay Stock 페이지에서 간단한 시세, 차트, 뉴스, 시장 랭킹, market-index 표를 조회합니다."
+  default_prompt: "네이버 금융 기준으로 005930의 간단한 종목 요약과 현재 시세를 조회해줘."

@@ -17,7 +17,7 @@ Base: `https://m.stock.naver.com/front-api`
 
 | 영역 | Pattern | 메모 |
 | --- | --- | --- |
-| 홈 요약 | `https://finance.naver.com/main/mainSummary.naver?callback=callback` | PC 홈 위젯 JSON. `front-api` base 예외입니다. 주요 key: `topItems`, `nxtTopItems`, `nxtMarketStatus`, `todayIndexItemList`, `todayIndexDealTrendList`, `kospiTrendProgram`, `groupTopList`, `themeTopList`, `searchList`. `callback=callback`은 JSONP wrapper를 붙입니다. |
+| 홈 요약 | `https://finance.naver.com/main/mainSummary.naver` | PC 홈 위젯 JSON. `front-api` base 예외입니다. 주요 key: `topItems`, `nxtTopItems`, `nxtMarketStatus`, `todayIndexItemList`, `todayIndexDealTrendList`, `kospiTrendProgram`, `groupTopList`, `themeTopList`, `searchList`. 현재 public response는 plain JSON입니다. |
 | 국내 종목 basic | `/stock/domestic/basic?code=005930&endType=stock` | 요약 시세, 거래소, chart image URL, NXT over-market 정보. |
 | 국내 종목 integration | `/stock/domestic/integration?code=005930&endType=stock` | 주요 지표, 투자자 동향 sample, research list, 동종 비교, consensus/IR 조각. |
 | 국내 종목 trend | `/stock/domestic/trend?code=005930` | 날짜별 투자자 동향. `scripts/stock_trend.py` 사용. |

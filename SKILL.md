@@ -1,6 +1,6 @@
 ---
 name: naverfinance-web-api
-description: Use when a user asks to inspect, catalog, or call unofficial read-only Naver Finance/네이버증권/네이버 금융 or Npay Stock/네이버페이 증권 public web data for stocks/주식 정보, 시세, quotes, charts, financials, rankings, investor trends, news, 공시, IPOs, 환율, commodities, indices, or finance.naver.com and m.stock.naver.com network calls/네트워크 호출.
+description: Use for public, read-only Naver Finance/네이버 금융 and Npay Stock/네이버페이 증권 market data visible without login, including endpoint re-verification.
 ---
 
 # Naver Finance Web API

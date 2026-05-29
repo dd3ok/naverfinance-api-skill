@@ -29,10 +29,16 @@ REPEATED_SECTIONS = {
 
 def fetch_home_summary(*, limit: int) -> dict[str, Any]:
     payload = request_json_url(
-        PC_BASE_URL + "/main/mainSummary.naver?callback=callback",
+        PC_BASE_URL + "/main/mainSummary.naver",
         referer=PC_BASE_URL + "/",
     )
-    result = payload.get("message", {}).get("result", {}) if isinstance(payload, dict) else {}
+    result: dict[str, Any] = {}
+    if isinstance(payload, dict):
+        message = payload.get("message")
+        if isinstance(message, dict):
+            inner = message.get("result")
+            if isinstance(inner, dict):
+                result = inner
     summary = {
         key: _limit_section(value, limit) if key in REPEATED_SECTIONS else value
         for key, value in result.items()

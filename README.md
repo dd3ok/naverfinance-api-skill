@@ -35,7 +35,7 @@ https://github.com/dd3ok/naverfinance-api-skill 에서 스킬을 설치해줘.
 수동 설치 또는 symlink도 가능합니다.
 
 ```bash
-CODEX_SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+CODEX_SKILLS_DIR="$HOME/.agents/skills"
 mkdir -p "$CODEX_SKILLS_DIR"
 git clone --depth 1 https://github.com/dd3ok/naverfinance-api-skill.git "$CODEX_SKILLS_DIR/naverfinance-web-api"
 ```
@@ -43,10 +43,12 @@ git clone --depth 1 https://github.com/dd3ok/naverfinance-api-skill.git "$CODEX_
 이미 clone한 작업 디렉터리를 쓰고 싶다면 symlink로 노출합니다.
 
 ```bash
-CODEX_SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+CODEX_SKILLS_DIR="$HOME/.agents/skills"
 mkdir -p "$CODEX_SKILLS_DIR"
 ln -sfn /path/to/naverfinance-api-skill "$CODEX_SKILLS_DIR/naverfinance-web-api"
 ```
+
+Repository-scoped installs can use `.agents/skills/naverfinance-web-api/` under the project root.
 
 ### Claude Code
 
@@ -70,8 +72,17 @@ git clone --depth 1 https://github.com/dd3ok/naverfinance-api-skill.git .claude/
 
 Gemini CLI에서도 같은 `SKILL.md` 패키지를 Agent Skill로 연결할 수 있습니다.
 
+Interactive Gemini CLI sessions can use:
+
+```text
+/skills link /path/to/naverfinance-api-skill
+```
+
+Terminal installs can use a local directory or Git repository:
+
 ```bash
-gemini skills link /path/to/naverfinance-api-skill
+gemini skills install /path/to/naverfinance-api-skill --consent
+gemini skills install https://github.com/dd3ok/naverfinance-api-skill.git --consent
 ```
 
 ### 로컬 스크립트만

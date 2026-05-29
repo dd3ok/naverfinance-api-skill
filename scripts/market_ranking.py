@@ -89,6 +89,12 @@ def _fallback_reason(exc: Exception) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
+def _require_rows_list(kind: str, rows):
+    if not isinstance(rows, list):
+        raise RuntimeError(f"Expected {kind} rows list, got {type(rows).__name__}")
+    return rows
+
+
 def fetch_ranking(kind: str, *, market: str, page: int, limit: int) -> dict:
     fallback_reason = None
     if kind == "dividend":
@@ -122,12 +128,14 @@ def fetch_ranking(kind: str, *, market: str, page: int, limit: int) -> dict:
                     "pageSize": limit or 20,
                 },
             )
+            rows = payload.get("stocks", []) if isinstance(payload, dict) else payload
+            rows = _require_rows_list(kind, rows)
             return {
                 "source": "m.stock.naver.com public front-api JSON",
                 "kind": kind,
                 "market": market,
                 "page": page,
-                "rows": payload.get("stocks", []) if isinstance(payload, dict) else payload,
+                "rows": rows,
             }
         except Exception as exc:
             fallback_reason = _fallback_reason(exc)
@@ -238,6 +246,7 @@ def fetch_dividend(*, page: int, limit: int) -> dict:
             referer_path="/domestic/home/dividend/revenue",
         )
         rows = payload.get("dividends", payload.get("stocks", payload)) if isinstance(payload, dict) else payload
+        rows = _require_rows_list("dividend", rows)
         return {
             "source": "m.stock.naver.com public front-api JSON",
             "kind": "dividend",
@@ -266,6 +275,7 @@ def fetch_etf(*, page: int, limit: int) -> dict:
             referer_path="/domestic/home/etf/aum",
         )
         rows = payload.get("etfs", payload.get("stocks", payload.get("result", payload))) if isinstance(payload, dict) else payload
+        rows = _require_rows_list("etf", rows)
         return {
             "source": "m.stock.naver.com public front-api JSON",
             "kind": "etf",
@@ -294,6 +304,7 @@ def fetch_sector_list(kind: str, *, page: int, limit: int) -> dict:
         referer_path=f"/domestic/home/{kind}/daily",
     )
     rows = payload.get("sectors", payload.get("result", payload)) if isinstance(payload, dict) else payload
+    rows = _require_rows_list(kind, rows)
     rows = _with_sector_detail_links(kind, rows)
     return {
         "source": "m.stock.naver.com public sector JSON",

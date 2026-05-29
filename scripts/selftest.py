@@ -19,11 +19,14 @@ def main() -> int:
     content = skill_md.read_text(encoding="utf-8")
     assert "[TODO" not in content, "SKILL.md still contains template TODOs"
     assert re.search(r"^---\nname: naverfinance-web-api\n", content), "frontmatter name missing"
-    assert "description: Use when" in content, "description should be trigger-focused"
+    assert "description: Use" in content, "description should be trigger-focused"
     assert "Never call login" in content, "hard safety rules missing"
 
     openai_yaml = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
-    assert "$naverfinance-web-api" in openai_yaml, "default prompt must mention skill name"
+    assert "default_prompt:" in openai_yaml, "OpenAI metadata default prompt missing"
+    test_skill_description_is_short_and_positive()
+    test_public_prompts_do_not_depend_on_dollar_selector()
+    test_codex_install_path_uses_agents_skills()
 
     for script in sorted((ROOT / "scripts").glob("*.py")):
         if script.name in {"naverfinance_api.py", "selftest.py"}:
@@ -56,10 +59,12 @@ def main() -> int:
     test_quote_service_index_query_is_supported()
     test_marketindex_api_prices_are_selected()
     test_marketindex_api_routes_fx_energy_and_metals()
+    test_marketindex_rejects_unsafe_api_path_segments()
     test_world_prices_use_world_day_json()
     test_dividend_and_etf_use_current_mobile_endpoints()
     test_sector_lists_use_current_mobile_endpoint()
     test_mobile_ranking_fallbacks_mark_reason()
+    test_mobile_ranking_rejects_unexpected_rows_shape()
 
     print("selftest ok")
     return 0
@@ -85,6 +90,29 @@ def test_front_json_rejects_error_payload() -> None:
             raise AssertionError("front_json should reject Naver error payloads")
     finally:
         naverfinance_api.mobile_json = original
+
+
+def test_skill_description_is_short_and_positive() -> None:
+    text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    frontmatter = text.split("---", 2)[1]
+    desc = next(line.removeprefix("description: ").strip() for line in frontmatter.splitlines() if line.startswith("description: "))
+    assert len(desc) <= 220
+    assert "public" in desc
+    assert "read-only" in desc
+    for broad in ["order", "balance", "holding", "personalized", "WTS", "comment"]:
+        assert broad.lower() not in desc.lower()
+
+
+def test_public_prompts_do_not_depend_on_dollar_selector() -> None:
+    for relpath in ["README.md", "SKILL.md", "agents/openai.yaml", "references/eval-prompts.md"]:
+        text = (ROOT / relpath).read_text(encoding="utf-8")
+        assert "$naverfinance-web-api" not in text
+
+
+def test_codex_install_path_uses_agents_skills() -> None:
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "$HOME/.agents/skills" in text
+    assert ".codex/skills" not in text
 
 
 def test_theme_and_upjong_tables_are_selected() -> None:
@@ -382,6 +410,7 @@ def test_news_search_requires_query_and_fetches_rows() -> None:
 def test_home_main_summary_limits_sections() -> None:
     import home
 
+    calls = []
     fixture = {
         "message": {
             "result": {
@@ -393,13 +422,19 @@ def test_home_main_summary_limits_sections() -> None:
         }
     }
     original = home.request_json_url
-    home.request_json_url = lambda *args, **kwargs: fixture
+
+    def fake_json(url, **kwargs):
+        calls.append(url)
+        return fixture
+
+    home.request_json_url = fake_json
     try:
         payload = home.fetch_home_summary(limit=1)
         assert payload["source"] == "finance.naver.com public mainSummary JSON"
         assert payload["summary"]["nxtMarketStatus"]["marketStatus"] == "OPEN"
         assert payload["summary"]["topItems"][0] == [{"code": "005930"}]
         assert payload["summary"]["nxtTopItems"][0] == [{"code": "005930"}]
+        assert "callback=" not in calls[0]
     finally:
         home.request_json_url = original
 
@@ -469,6 +504,18 @@ def test_marketindex_api_routes_fx_energy_and_metals() -> None:
         assert "IRR_*" in str(exc)
     else:
         raise AssertionError("legacy-only interest codes should fail before requesting a guessed URL")
+
+
+def test_marketindex_rejects_unsafe_api_path_segments() -> None:
+    import marketindex
+
+    for code in ["FX_USD/JPY", "FX_USD\\JPY", "FX_..", "FX_USD?JPY"]:
+        try:
+            marketindex._api_marketindex_route(code)
+        except SystemExit as exc:
+            assert "format" in str(exc)
+        else:
+            raise AssertionError(f"{code} should not be accepted as a marketindex path segment")
 
 
 def test_world_prices_use_world_day_json() -> None:
@@ -574,6 +621,39 @@ def test_mobile_ranking_fallbacks_mark_reason() -> None:
         assert "mobile down" in dividend["fallbackReason"]
         assert theme["market"] == "kosdaq"
         assert "mobile down" in theme["fallbackReason"]
+    finally:
+        market_ranking.pc_text = original_pc_text
+        market_ranking.front_json = original_front_json
+
+
+def test_mobile_ranking_rejects_unexpected_rows_shape() -> None:
+    import market_ranking
+
+    fixture = """
+    <table class="type_1">
+      <tr><th>N</th><th>name</th></tr>
+      <tr><td>1</td><td>sample</td></tr>
+    </table>
+    """
+    original_pc_text = market_ranking.pc_text
+    original_front_json = market_ranking.front_json
+    market_ranking.pc_text = lambda *args, **kwargs: fixture
+
+    def fake_front_json(path, params=None, **kwargs):
+        if path == "/domestic/stock/list":
+            return {"dividends": {"bad": True}}
+        if path == "/stock/sectors/all":
+            return {"sectors": {"bad": True}}
+        raise AssertionError(f"unexpected path: {path}")
+
+    market_ranking.front_json = fake_front_json
+    try:
+        dividend = market_ranking.fetch_ranking("dividend", market="kospi", page=1, limit=5)
+        upjong = market_ranking.fetch_ranking("upjong", market="kospi", page=1, limit=5)
+        assert dividend["source"] == "finance.naver.com public PC HTML table"
+        assert "Expected dividend rows list" in dividend["fallbackReason"]
+        assert upjong["source"] == "finance.naver.com public PC HTML table"
+        assert "Expected upjong rows list" in upjong["fallbackReason"]
     finally:
         market_ranking.pc_text = original_pc_text
         market_ranking.front_json = original_front_json

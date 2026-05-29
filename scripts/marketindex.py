@@ -60,6 +60,7 @@ API_MARKETINDEX_ALIASES = {
     "TIOC1": ("metals", "TIOc1"),
     "M04020000": ("metals", "M04020000"),
 }
+API_CODE_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 def fetch_marketindex(kind: str, *, code: str | None, page: int, limit: int) -> dict:
@@ -132,16 +133,23 @@ def fetch_api_detail(code: str) -> dict:
 def _api_marketindex_route(code: str) -> tuple[str, str]:
     value = code.strip().upper()
     if value in API_MARKETINDEX_ALIASES:
-        return API_MARKETINDEX_ALIASES[value]
+        group, api_code = API_MARKETINDEX_ALIASES[value]
+        return group, _api_code_segment(api_code)
     if value.startswith("FX_"):
-        tail = value[3:]
+        tail = _api_code_segment(value[3:])
         if tail.endswith("KRW"):
-            return "exchange", value
+            return "exchange", _api_code_segment(value)
         return "exchangeWorld", tail
     raise SystemExit(
         "--kind api-detail/api-prices supports FX_* exchange codes, FX_USDX, energy, and metals codes; "
         "use --kind detail for legacy-only marketindex pages such as IRR_* interest rates"
     )
+
+
+def _api_code_segment(value: str) -> str:
+    if not API_CODE_SEGMENT_RE.fullmatch(value) or ".." in value:
+        raise SystemExit("Unsupported marketindex code format")
+    return value
 
 
 def _fetch_tables(path: str, params: dict, *, kind: str, page: int, limit: int) -> dict:
