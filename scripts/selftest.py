@@ -21,14 +21,17 @@ def main() -> int:
     assert re.search(r"^---\nname: naverfinance-web-api\n", content), (
         "frontmatter name missing"
     )
-    assert "description: Use" in content, "description should be trigger-focused"
+    assert "description: Inspects" in content, (
+        "description should be third-person and trigger-focused"
+    )
     assert "Never call login" in content, "hard safety rules missing"
 
     openai_yaml = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
     assert "default_prompt:" in openai_yaml, "OpenAI metadata default prompt missing"
     test_skill_description_is_short_and_positive()
-    test_public_prompts_do_not_depend_on_dollar_selector()
+    test_openai_prompt_names_skill_without_affecting_user_prompts()
     test_codex_install_path_uses_agents_skills()
+    test_references_are_directly_routed_and_long_docs_have_toc()
     test_release_checklist_covers_public_skill_surface()
 
     for script in sorted((ROOT / "scripts").glob("*.py")):
@@ -206,21 +209,37 @@ def test_skill_description_is_short_and_positive() -> None:
         assert broad.lower() not in desc.lower()
 
 
-def test_public_prompts_do_not_depend_on_dollar_selector() -> None:
+def test_openai_prompt_names_skill_without_affecting_user_prompts() -> None:
     for relpath in [
         "README.md",
         "SKILL.md",
-        "agents/openai.yaml",
         "references/eval-prompts.md",
     ]:
         text = (ROOT / relpath).read_text(encoding="utf-8")
         assert "$naverfinance-web-api" not in text
+
+    metadata = (ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+    assert "$naverfinance-web-api" in metadata
 
 
 def test_codex_install_path_uses_agents_skills() -> None:
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "$HOME/.agents/skills" in text
     assert ".codex/skills" not in text
+
+
+def test_references_are_directly_routed_and_long_docs_have_toc() -> None:
+    skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    references = sorted((ROOT / "references").glob("*.md"))
+    assert references
+    for path in references:
+        relative = path.relative_to(ROOT).as_posix()
+        assert f"]({relative})" in skill, f"unrouted reference: {relative}"
+        text = path.read_text(encoding="utf-8")
+        if len(text.splitlines()) > 100:
+            assert re.search(r"(?m)^## (목차|Contents)$", text), (
+                f"long reference has no TOC: {relative}"
+            )
 
 
 def test_release_checklist_covers_public_skill_surface() -> None:
